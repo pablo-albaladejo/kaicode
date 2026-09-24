@@ -1,0 +1,4 @@
+{
+  "mode": "shadow",
+  "tiers": { "cheap": "fireworks/deepseek-v4.1-flash", "strong": "fireworks/kimi-k3" }
+}

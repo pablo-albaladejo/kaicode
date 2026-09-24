@@ -1,0 +1,47 @@
+{
+  "_source": "Model groups for the Aircall LLM Gateway (llmgateway.io). Prices come from pricing.json. Checked 2026-09-23.",
+  "_note": "Ids are what the gateway accepts as the Anthropic-compatible 'model' field. A '<provider>/' prefix pins the provider (fireworks/… is what aircode uses); a bare id lets the gateway pick the provider. If a bare id is rejected, pin it with the provider shown in the gateway model list.",
+  "aliases": {
+    "haiku":  "fireworks/deepseek-v4.1-flash",
+    "sonnet": "fireworks/deepseek-v4.1-flash",
+    "opus":   "fireworks/kimi-k3",
+    "fable":  "fireworks/kimi-k3"
+  },
+  "groups": {
+    "cheap": {
+      "use": "search, listings, lookups, routine edits, subagents by default",
+      "models": [
+        "fireworks/deepseek-v4.1-flash",
+        "gpt-6-luna",
+        "glm-5.3-flash",
+        "gpt-5.6-luna",
+        "ling-3.0-flash",
+        "gemini-3.1-flash-lite"
+      ]
+    },
+    "mid": {
+      "use": "implementation with some ambiguity, medium refactors, plans that are not architecture",
+      "models": [
+        "gpt-6-sol",
+        "fireworks/deepseek-v4-pro",
+        "glm-5.3",
+        "grok-build-0-1",
+        "grok-4-3",
+        "gemini-3.8-flash",
+        "claude-sonnet-5",
+        "gpt-5.6-terra"
+      ]
+    },
+    "strong": {
+      "use": "architecture, adversarial review, concurrency, migrations, subtle root causes",
+      "models": [
+        "fireworks/kimi-k3",
+        "claude-opus-5-5",
+        "gpt-6-sol",
+        "gpt-5.6-sol",
+        "claude-opus-5",
+        "gpt-5.5"
+      ]
+    }
+  }
+}

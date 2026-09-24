@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(openspec:*)"
+    ]
+  },
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/pablo/.claude-work/hooks/log-subagent.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark"
+}

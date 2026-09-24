@@ -1,0 +1,490 @@
+<title>Claude Kit Cheatsheet</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#f6f4ee; --bg2:#ffffff; --ink:#1d2430; --ink2:#5a6270; --line:#dcd8cc; --accent:#b8521a; --accent2:#f0e2d6;
+  --code:#f0ede4; --ok:#2f7d4f; --warn:#a36a00; --bad:#b3261e; --nav:#efece3;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ color-scheme:dark;
+  --bg:#15181d; --bg2:#1c2026; --ink:#e6e3da; --ink2:#a4a8b0; --line:#2f353d; --accent:#e58a4e; --accent2:#3a2a20; --code:#22262d; --ok:#5fbf85; --warn:#e0b04a; --bad:#ef7a72; --nav:#1a1e24; } }
+:root[data-theme="dark"]{ color-scheme:dark;
+  --bg:#15181d; --bg2:#1c2026; --ink:#e6e3da; --ink2:#a4a8b0; --line:#2f353d; --accent:#e58a4e; --accent2:#3a2a20; --code:#22262d; --ok:#5fbf85; --warn:#e0b04a; --bad:#ef7a72; --nav:#1a1e24; }
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-block:24px;padding-inline:16px;display:grid;grid-template-columns:200px 1fr;gap:32px}
+@media (max-width:820px){.wrap{grid-template-columns:1fr}}
+nav{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;background:var(--nav);border:1px solid var(--line);border-radius:6px;padding:12px}
+@media (max-width:820px){nav{position:static}}
+nav a{display:block;color:var(--ink2);text-decoration:none;font-size:13px;padding:4px 6px;border-radius:4px}
+nav a:hover,nav a:focus-visible{background:var(--accent2);color:var(--ink);outline:none}
+nav .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:0 0 6px 6px}
+header{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 20px;border-bottom:2px solid var(--accent);padding-bottom:12px}
+h1{font-size:26px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+header .sub{color:var(--ink2);font-size:14px}
+main{min-width:0}
+section{margin-bottom:40px}
+h2{font-size:19px;font-weight:600;margin:0 0 12px;padding-top:8px;text-wrap:balance}
+h2 .n{font-family:var(--mono);color:var(--accent);font-size:13px;margin-right:8px}
+h3{font-size:15px;font-weight:600;margin:20px 0 6px}
+p{margin:0 0 10px;max-width:72ch}
+code{font-family:var(--mono);font-size:.92em;background:var(--code);padding:1px 5px;border-radius:3px}
+pre{font-family:var(--mono);font-size:13px;background:var(--code);border:1px solid var(--line);border-radius:6px;padding:12px 14px;overflow-x:auto;margin:8px 0 14px;position:relative;line-height:1.55}
+pre code{background:none;padding:0}
+pre .c{color:var(--ink2)}
+.copy{position:absolute;top:6px;right:6px;font:12px var(--sans);background:var(--bg2);border:1px solid var(--line);color:var(--ink2);border-radius:4px;padding:2px 8px;cursor:pointer}
+.copy:hover,.copy:focus-visible{color:var(--ink);outline:none;border-color:var(--accent)}
+.tw{overflow-x:auto;margin:8px 0 14px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:7px 10px;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--ink2);font-size:12px;letter-spacing:.06em;text-transform:uppercase;background:var(--bg2)}
+td code{white-space:nowrap}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.pill{display:inline-block;font:12px var(--mono);padding:1px 7px;border-radius:10px;border:1px solid var(--line);background:var(--bg2);white-space:nowrap}
+.pill.ok{color:var(--ok);border-color:var(--ok)} .pill.warn{color:var(--warn);border-color:var(--warn)} .pill.bad{color:var(--bad);border-color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:8px 0 14px}
+.box{background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.box h4{margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.box ul{margin:0;padding-left:18px}
+.box li{margin:2px 0}
+.note{border-left:3px solid var(--accent);padding:6px 12px;background:var(--accent2);border-radius:0 6px 6px 0;margin:10px 0 14px;max-width:80ch}
+.flow{font-family:var(--mono);font-size:13px;background:var(--code);border:1px solid var(--line);border-radius:6px;padding:10px 14px;overflow-x:auto;white-space:nowrap;margin:8px 0 14px}
+kbd{font-family:var(--mono);font-size:.9em;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:var(--bg2)}
+#arch svg .b{fill:var(--bg2);stroke:currentColor;stroke-width:1.2;rx:5}
+#arch svg .g{fill:none;stroke:currentColor;stroke-width:1;stroke-dasharray:4 3;rx:8}
+#arch svg .t{fill:currentColor} .m{font-family:var(--mono);font-size:11px;fill:currentColor} .h{font-weight:600;font-size:13px;fill:currentColor}
+#arch svg .s{fill:var(--ink2);font-size:11px} .cap{fill:var(--accent);font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
+#arch svg .e{stroke:currentColor;stroke-width:1.2;fill:none;marker-end:url(#ar)} .ea{stroke:var(--accent);stroke-width:1.6;fill:none;marker-end:url(#arA)}
+#arch svg .l{font-size:11px;fill:currentColor} .la{font-size:11px;fill:var(--accent);font-weight:500}
+footer{grid-column:1/-1;color:var(--ink2);font-size:12px;border-top:1px solid var(--line);padding-top:10px}
+@media (prefers-reduced-motion:no-preference){nav a{transition:background .12s}}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>Claude Kit Cheatsheet</h1>
+  <span class="sub">Claude Code on the Aircall LLM Gateway · user-level setup in <code>~/.claude</code> · staging in <code>~/.claude-work</code> · updated 2026-09-24 · v11</span>
+</header>
+
+<nav aria-label="Sections">
+  <div class="k">Contents</div>
+  <a href="#arch">0 Architecture</a>
+  <a href="#launch">1 Launch</a>
+  <a href="#agents">2 Agents</a>
+  <a href="#routing">3 Model routing</a>
+  <a href="#table">4 Use-case table</a>
+  <a href="#git">5 Git workflow</a>
+  <a href="#review">6 MR review</a>
+  <a href="#cost">7 Costs &amp; monitoring</a>
+  <a href="#files">8 Files</a>
+  <a href="#trouble">9 Troubleshooting</a>
+  <a href="#security">10 Security</a>
+  <a href="#sdlc">11 SDLC · /ship</a>
+</nav>
+
+<main>
+
+<section id="arch">
+<h2><span class="n">0</span>Architecture</h2>
+<figure style="margin:0 0 14px">
+<div class="tw"><svg viewBox="0 0 1160 640" role="img" aria-label="How a request flows: the claude wrapper starts Claude Code as the lead agent; every subagent launch passes through PreToolUse hooks, where the model router asks Jev through the LLM Gateway and rewrites the launch to a model and an effort variant; lead and subagents call the Aircall LLM Gateway, which routes to Fireworks, OpenAI or Anthropic and traces to Langfuse; the reviewer reads GitLab through glab and mr-post writes inline comments; transcripts and hook logs feed the statusline, cc-cost and the router report." style="min-width:900px;width:100%;height:auto;font-family:var(--sans);font-size:12px;color:var(--ink)">
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
+  <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+</defs>
+
+<!-- You -->
+<text x="20" y="28" class="cap">YOU</text>
+<rect x="20" y="40" width="170" height="64" class="b"/>
+<text x="32" y="60" class="h">Terminal</text>
+<text x="32" y="78" class="m">claude @ticket @pick @solo</text>
+<text x="32" y="94" class="s">zsh wrapper: loads .env + key</text>
+<rect x="20" y="118" width="170" height="44" class="b"/>
+<text x="32" y="138" class="h">VS Code extension</text>
+<text x="32" y="154" class="s">binary directly; settings.json only</text>
+
+<!-- Claude Code -->
+<text x="250" y="28" class="cap">CLAUDE CODE (v2.1.281)</text>
+<rect x="250" y="40" width="270" height="122" class="b"/>
+<text x="262" y="60" class="h">lead  <tspan class="s" font-weight="400">primary agent</tspan></text>
+<text x="262" y="78" class="m">deepseek-v4.1-flash · high</text>
+<text x="262" y="96" class="s">no Edit/Write → launches "task" + brief</text>
+<text x="262" y="114" class="s">settings.json · CLAUDE.md · statusline</text>
+<text x="262" y="132" class="s">/review-mr · /opsx:* · @solo = all tools</text>
+<text x="262" y="150" class="s">gateway · ≤ 3 subagents · spawn depth 1</text>
+
+<!-- Hooks -->
+<rect x="250" y="200" width="270" height="214" class="g"/>
+<text x="262" y="220" class="cap">HOOKS (PreToolUse · UserPromptSubmit)</text>
+<rect x="262" y="230" width="246" height="92" class="b" style="stroke:var(--accent)"/>
+<text x="272" y="248" class="h">model-router.mjs</text>
+<text x="272" y="266" class="s"><tspan class="la">1</tspan> brief → Jev → use_case + complexity</text>
+<text x="272" y="282" class="s"><tspan class="la">2</tspan> use_case → role (roles map)</text>
+<text x="272" y="298" class="s"><tspan class="la">3</tspan> use_case × complexity → model · effort</text>
+<text x="272" y="314" class="s">rewrites subagent_type only (never model)</text>
+<rect x="262" y="332" width="118" height="40" class="b"/>
+<text x="270" y="348" class="h" font-size="12">guard-branch</text>
+<text x="270" y="364" class="s">deny edits on main</text>
+<rect x="390" y="332" width="118" height="40" class="b"/>
+<text x="398" y="348" class="h" font-size="12">intent · bash-guard</text>
+<text x="398" y="364" class="s">Jev: intent+skill · rm/push</text>
+<rect x="262" y="380" width="246" height="28" class="b" style="stroke:var(--accent)"/>
+<text x="270" y="393" class="h" font-size="12">read-shunt</text><text x="345" y="393" class="s">sol/opus/pro · Read &gt; 350 lines</text>
+<text x="270" y="405" class="s" font-size="8.5">→ deny → bulk-read (cheap agents, windows pass)</text>
+
+<!-- Subagents -->
+<text x="590" y="28" class="cap">SUBAGENTS (own context, summary back)</text>
+<rect x="590" y="40" width="230" height="182" class="b"/>
+<text x="602" y="58" class="m" style="fill:var(--accent)">task → ② role assigned by router</text>
+<text x="602" y="76" class="h">Explore</text><text x="700" y="76" class="s">read-only · 25 turns</text>
+<text x="602" y="94" class="h">investigator</text><text x="700" y="94" class="s">CLIs · root cause</text>
+<text x="602" y="112" class="h">planner</text><text x="700" y="112" class="s">plan · OpenSpec · ADR</text>
+<text x="602" y="130" class="h">implementer</text><text x="700" y="130" class="s">own worktree · TDD</text>
+<text x="602" y="148" class="h">reviewer</text><text x="700" y="148" class="s">JSON findings</text>
+<line x1="602" y1="158" x2="808" y2="158" stroke="currentColor" stroke-dasharray="2 3"/>
+<text x="602" y="176" class="m">+ &lt;role&gt;--&lt;model&gt;-&lt;effort&gt;</text>
+<text x="602" y="192" class="s">50 variants: model + effort in frontmatter</text>
+<text x="602" y="208" class="m" style="fill:var(--accent)">bulk-read · code-write (flash)</text>
+
+<!-- Gateway -->
+<text x="890" y="28" class="cap">AIRCALL LLM GATEWAY</text>
+<rect x="890" y="40" width="250" height="182" class="b"/>
+<text x="902" y="60" class="h">api.llmgateway.io</text>
+<text x="902" y="76" class="s">Messages API · prompt cache · key ~/.aircode</text>
+<rect x="902" y="88" width="226" height="30" class="b"/>
+<text x="910" y="107" class="m">fireworks · deepseek flash · pro</text>
+<rect x="902" y="124" width="226" height="30" class="b"/>
+<text x="910" y="143" class="m">openai gpt-6-luna · gpt-6-sol</text>
+<rect x="902" y="160" width="226" height="30" class="b"/>
+<text x="910" y="179" class="m">anthropic claude-opus-5-5</text>
+<text x="902" y="210" class="s">+ 74 more (claude @pick)</text>
+
+<rect x="890" y="250" width="250" height="44" class="b"/>
+<text x="902" y="268" class="h">Langfuse</text>
+<text x="902" y="284" class="s">every gateway call traced (cost source of truth)</text>
+
+<!-- Jev -->
+<rect x="890" y="320" width="250" height="58" class="b" style="stroke:var(--accent)"/>
+<text x="902" y="340" class="h">Jev  <tspan class="s" font-weight="400">TypeSafe System One</tspan></text>
+<text x="902" y="356" class="m">POST /v1/systemone · jev-1.13.0</text>
+<text x="902" y="371" class="s">your own gateway org · JEV_LLMGATEWAY_KEY · ~0.5 s</text>
+
+<!-- GitLab -->
+<rect x="590" y="250" width="230" height="70" class="b"/>
+<text x="602" y="270" class="h">GitLab</text>
+<text x="602" y="288" class="s">glab (read: MR, diff, threads, pipeline)</text>
+<text x="602" y="304" class="s">mr-post.mjs → inline discussions only</text>
+
+<!-- Observability -->
+<rect x="20" y="420" width="1120" height="200" class="g"/>
+<text x="32" y="440" class="cap">OBSERVABILITY (local, from ~/.claude)</text>
+<rect x="32" y="452" width="250" height="60" class="b"/>
+<text x="44" y="470" class="h">transcripts</text>
+<text x="44" y="486" class="s">projects/&lt;cwd&gt;/&lt;session&gt;.jsonl</text>
+<text x="44" y="500" class="s">+ subagents/agent-*.jsonl (tokens, cache)</text>
+<rect x="32" y="524" width="250" height="60" class="b"/>
+<text x="44" y="542" class="h">logs/*.jsonl</text>
+<text x="44" y="558" class="s">model-router · agent-launches · subagents</text>
+<text x="44" y="572" class="s">session-costs · read-shunt · code-write · guards</text>
+<rect x="340" y="452" width="230" height="60" class="b"/>
+<text x="352" y="470" class="h">statusline.mjs</text>
+<text x="352" y="486" class="s">model · ctx · real $ · live ▶ subagents</text>
+<text x="352" y="500" class="s">refresh 3 s</text>
+<rect x="340" y="524" width="230" height="60" class="b"/>
+<text x="352" y="542" class="h">cc-cost</text>
+<text x="352" y="558" class="s">per session / agent / tool / model + bulk-read · code-write</text>
+<text x="352" y="572" class="s">--days --all --top --session</text>
+<rect x="630" y="452" width="230" height="60" class="b"/>
+<text x="642" y="470" class="h">pricing.json</text>
+<text x="642" y="486" class="s">209 entries, 79 models (gateway list)</text>
+<text x="642" y="500" class="s">exact → no date → no provider</text>
+<rect x="630" y="524" width="230" height="60" class="b"/>
+<text x="642" y="542" class="h">model-router --report</text>
+<text x="642" y="558" class="s">case × complexity, effort applied,</text>
+<text x="642" y="572" class="s">Jev vs rules, errors</text>
+<rect x="920" y="452" width="210" height="132" class="b"/>
+<text x="932" y="470" class="h">gateway-smoke.sh</text>
+<text x="932" y="486" class="s">tool round-trip + cache_read</text>
+<text x="932" y="502" class="s">✓ flash · sol · opus (2026-09-23)</text>
+<text x="932" y="526" class="h">jev-tune.mjs</text>
+<text x="932" y="542" class="s">15 tasks bench: 12/15</text>
+<text x="932" y="566" class="s">Native $ of Claude Code: unreliable</text>
+<text x="932" y="580" class="s">for gateway ids (unrecognized_model)</text>
+
+<!-- Edges -->
+<path d="M190 72 L250 72" class="e"/><text x="196" y="66" class="l">starts</text>
+<path d="M190 140 L250 120" class="e"/>
+<path d="M385 162 L385 200" class="ea"/><text x="392" y="184" class="la">Agent tool: launch subagent</text>
+<path d="M508 276 L560 276 L560 400 L870 400 L890 352" class="ea" marker-start="url(#arA)"/><text x="600" y="394" class="la">① brief → Jev · use_case + complexity ← (one call, ~0.5 s)</text>
+<path d="M508 244 L548 244 L548 130 L590 130" class="ea"/><text x="543" y="236" class="la" transform="rotate(-90 543 236)">②③ role · model · effort</text>
+<path d="M520 150 L560 236 L870 236 L890 205" class="e"/><text x="575" y="231" class="l">Messages API (lead) · cache hits</text>
+<path d="M820 100 L890 100" class="e"/><text x="826" y="118" class="l">subagents · bulk-read · code-write</text>
+<path d="M1015 222 L1015 250" class="e"/><text x="1022" y="240" class="l">traces</text>
+<path d="M705 222 L705 250" class="e"/><text x="712" y="246" class="l">reviewer · investigator via glab</text>
+<path d="M300 162 L300 200" class="e"/><text x="196" y="184" class="l" text-anchor="start">Edit/Write →</text>
+<path d="M330 414 L330 420" class="e"/><text x="338" y="418" class="l" font-size="9">logs</text>
+<path d="M157 512 L157 524" class="e"/>
+<path d="M282 482 L340 482" class="e"/><text x="288" y="476" class="l">reads</text>
+<path d="M282 554 L340 554" class="e"/>
+<path d="M570 554 L630 554" class="e"/><text x="574" y="548" class="l">reads</text>
+<path d="M570 482 L630 482" class="e"/><text x="576" y="476" class="l">prices</text>
+</svg></div>
+<figcaption class="s" style="margin-top:4px">One request: the wrapper starts Claude Code as <code>lead</code>; the lead launches the generic <code>task</code> with a brief; the router asks Jev (through your own LLM Gateway org) and rewrites the launch to a role variant that carries the model and the effort (Claude Code only accepts <code>sonnet|opus|haiku|fable</code> as <code>model</code> in the Agent tool, so the router never touches it); all model calls go to the Aircall gateway and are traced in Langfuse; transcripts and hook logs feed the local cost tools. Reads over 350 lines by an agent on sol/opus/pro are shunted: the hook denies the Read and the agent calls <code>bulk-read</code>, which lets flash read the files through the gateway and returns cited bullets (after Spotify's shunt plugin, no Portal needed); the mirror image, <code>code-write</code>, lets flash write mechanical files to disk for implementers on pro/sol. Orange = the routing path.</figcaption>
+</figure>
+</section>
+
+<section id="launch">
+<h2><span class="n">1</span>Launch</h2>
+<p><code>claude</code> is a zsh function (<code>~/.zshrc</code>, block <code>claude-gateway</code>). It loads <code>~/.claude/aircall-gateway.env</code> (gateway URL, model aliases, limits), reads the gateway key live from <code>~/.aircode/config.json</code>, clears <code>CLAUDE_CONFIG_DIR</code>, and starts the binary. Every session goes through <code>https://api.llmgateway.io</code> and is traced in Langfuse.</p>
+<pre><button class="copy" data-copy>copy</button><code>claude                              <span class="c"># primary agent: lead · model: fireworks/deepseek-v4.1-flash · high</span>
+claude @ticket APR-1234 [slug]      <span class="c"># fetch, ff main, worktree ../&lt;repo&gt;.wt/APR-1234 on feat/APR-1234, then claude there</span>
+/ticket APR-5678 [slug]             <span class="c"># inside a session: prepare that ticket's worktree; then `claude @ticket APR-5678` in a new terminal (cd does not persist)</span>
+claude @pick                        <span class="c"># fzf over all 79 gateway models (id · in · out · cache · group), then --model</span>
+claude @strong  ·  @mid:2  ·  @gpt-6-sol   <span class="c"># group (models.json), Nth of a group, or any model id</span>
+claude @solo                        <span class="c"># primary agent "solo": all tools, can edit files itself</span>
+claude @ticket APR-1234 @solo --continue   <span class="c"># combine freely; extra args go to claude</span>
+GUARD_BRANCH=off claude             <span class="c"># one session without the main-branch guard</span>
+cc-models          cc-models --list          cc-cost --days 7 --all</code></pre>
+<div class="note">VS Code's extension starts the binary directly, without the zsh function. It picks up <code>settings.json</code> (agent, hooks, statusline) but not the <code>.env</code>; if it shows a Sonnet model or no statusline, check the process environment (section 9).</div>
+<h3>In-session</h3>
+<div class="tw"><table>
+<tr><th>Command</th><th>Effect</th></tr>
+<tr><td><code>/model gpt-6-sol</code></td><td>Switch the primary model (any gateway id). The picker lists the 6 curated models with prices; <code>/model opus</code> = kimi-k3, <code>sonnet</code>/<code>haiku</code> = deepseek flash (aliases from the .env).</td></tr>
+<tr><td><code>/effort low|medium|high|max</code></td><td>Primary effort. Subagent effort comes from the router (section 3).</td></tr>
+<tr><td><code>/review-mr !123</code></td><td>Review an MR and post inline comments (section 6).</td></tr>
+<tr><td><code>/opsx:explore · propose · apply · update · sync · archive</code></td><td>OpenSpec workflow. <code>/opsx:apply</code> delegates to implementer + reviewer.</td></tr>
+<tr><td><code>/agents</code></td><td>Lists lead, solo, task, the 5 specialists and their 50 variants (<code>&lt;role&gt;--&lt;model alias&gt;-&lt;effort&gt;</code>, e.g. <code>investigator--sol-high</code>, router-managed).</td></tr>
+</table></div>
+</section>
+
+<section id="agents">
+<h2><span class="n">2</span>Agents</h2>
+<p><strong>Primary</strong> = the agent the session starts as (<code>settings.json "agent": "lead"</code>). <strong>Subagents</strong> = launched by the primary with a brief; each runs in its own context and returns a summary. Files: <code>~/.claude/agents/*.md</code>, all in English.</p>
+<div class="tw"><table>
+<tr><th>Agent</th><th>Role</th><th>Tools</th><th>Default model</th><th>Limits</th><th>Notes</th></tr>
+<tr><td><code>lead</code> <span class="pill">primary</span></td><td>Understands the request, writes the brief, launches <code>task</code>, integrates, reports. <strong>No Edit/Write</strong>: every change goes through implementer.</td><td>Read Grep Glob Bash Agent Skill AskUserQuestion TodoWrite plan mode Web</td><td>deepseek-v4.1-flash · high</td><td>—</td><td>Reads ≤ 2 files itself; never passes <code>model:</code>; a failed launch is reported as is, never retried or shortened; ≤ 2 subagents in parallel</td></tr>
+<tr><td><code>solo</code> <span class="pill">primary</span></td><td>Default assistant with all tools (<code>claude @solo</code>).</td><td>all</td><td>deepseek-v4.1-flash · high</td><td>—</td><td>For hands-on quick edits</td></tr>
+<tr><td><code>task</code> <span class="pill">entry point</span></td><td>Generic placeholder the lead launches with the brief. The router replaces it with a specialist before it runs (if it ever runs as itself, it reports "ROUTER FALLBACK").</td><td>Read Grep Glob Bash</td><td>deepseek-v4.1-flash</td><td>—</td><td>Brief starts with the kind of work: read-only / lookup / plan / change / review</td></tr>
+<tr><td><code>Explore</code></td><td>Find code, explain how something works. Read-only.</td><td>Read Grep Glob Bash</td><td>deepseek-v4.1-flash</td><td>25 turns</td><td>Replaces the built-in Explore (same name, capital E)</td></tr>
+<tr><td><code>investigator</code></td><td>Lookups (MR, pipeline, ticket, aws) and root-cause analysis. Read-only, has the CLIs.</td><td>Read Grep Glob Bash</td><td>deepseek-v4.1-flash</td><td>30 turns</td><td>Root cause: reproduce → narrow → locate → explain</td></tr>
+<tr><td><code>planner</code></td><td>Plan a ticket, OpenSpec proposal, ADR with options. Read-only.</td><td>Read Grep Glob Bash</td><td>gpt-6-sol</td><td>30 turns</td><td>Writes only under <code>openspec/changes/</code>, <code>docs/adr/</code></td></tr>
+<tr><td><code>implementer</code></td><td>Any file change: feature, fix, refactor, tests, migration, CI, docs. TDD, conventional commit.</td><td>Read Grep Glob Edit Write Bash</td><td>deepseek-v4.1-flash</td><td>60 turns</td><td>Own worktree; <code>omitClaudeMd</code>; returns status, files, tests, notes (no diff)</td></tr>
+<tr><td><code>reviewer</code></td><td>MR / branch review. Blockers by default; <code>scope: full</code> adds minor, questions, suggestions. Fix snippet on every finding.</td><td>Read Grep Glob Bash</td><td>gpt-6-sol</td><td>≤ 12 findings</td><td>Returns JSON; never writes to GitLab</td></tr>
+</table></div>
+<div class="grid">
+<div class="box"><h4>Agent vs skill vs command</h4><ul><li><strong>Agent</strong>: "someone does X and returns Y" (own context, model, tools).</li><li><strong>Skill</strong>: "when you do X, do it this way" (knowledge in the current context; auto-loaded).</li><li><strong>Command</strong>: "I start X with these args" (<code>/name</code>, a flow the user controls).</li></ul></div>
+<div class="box"><h4>Model · effort variants</h4><ul><li><code>gen-effort-variants.mjs</code> reads the router table and writes <code>&lt;role&gt;--&lt;alias&gt;-&lt;effort&gt;.md</code> for the 5 subagents: same prompt, frontmatter <code>model:</code> (gateway id) + <code>effort:</code>. 5 roles × 10 (model, effort) pairs = 50 files.</li><li>The router only swaps <code>subagent_type</code> to that variant; it never sets <code>model</code> (the Agent tool rejects anything but <code>sonnet|opus|haiku|fable</code> there). Never launch variants by hand.</li><li>Re-run after editing a base agent or the table; <code>--clean</code> removes them. <code>cc-cost</code> and the statusline group them under the base role.</li></ul></div>
+<div class="box"><h4>Read shunt (cheap reads for expensive agents)</h4><ul><li>Reading is I/O, not thinking. An agent on <code>sol</code>/<code>opus</code>/<code>pro</code> that Reads a file &gt; 350 lines whole is denied by <code>hooks/read-shunt.mjs</code> and told to run <code>node ~/.claude/tools/bulk-read.mjs "&lt;question&gt;" &lt;files…&gt;</code>.</li><li><code>bulk-read</code> sends the files (numbered, XML-wrapped) to <code>deepseek-v4.1-flash</code> through the gateway and prints cited bullets; the expensive agent pays for the answer only (~90% less on big reads, Spotify's shunt result). Windowed Reads (<code>offset</code>+<code>limit</code>) always pass, for quoting and editing.</li><li>Cheap agents (flash, luna) and the lead read directly. Not for editing or judgement: line numbers are for locating, verify with a small Read.</li><li>Limits: ≤ 3 subagents in parallel, spawn depth 1 (subagents never launch subagents; bulk-read is a plain call, no slot).</li></ul></div>
+<div class="box"><h4>code-write (cheap output for mechanical files)</h4><ul><li>Output tokens are the expensive ones. An implementer on <code>pro</code>/<code>sol</code> can describe a mechanical file (fixtures, table tests, migrations, types from a schema, a module mirroring another) and let flash write it: <code>node ~/.claude/tools/code-write.mjs "&lt;spec&gt;" --out &lt;new file&gt; --ref &lt;file to imitate&gt;</code>. The agent never reads the result: tests, linter and <code>git diff --stat</code> verify it.</li><li>Guard rails: refuses on main/master; new files only unless <code>--overwrite</code>; specs under 40 chars refused; bash-guard denies it to every agent but <code>implementer--pro|sol-*</code> (<code>codeWriteAgents</code>). Never for business logic or security-sensitive code.</li><li><code>code-write --report</code>: files kept as generated vs edited afterwards, the metric that says whether delegating the write pays off.</li></ul></div>
+</div>
+</section>
+
+<section id="routing">
+<h2><span class="n">3</span>Model routing (Jev)</h2>
+<p>A PreToolUse hook on every <code>Agent</code> launch. Jev (TypeSafe System One, via the gateway, key <code>JEV_LLMGATEWAY_KEY</code>) answers two questions in one call (~800 tokens, ~0.5 s); the table turns them into a model and an effort; the hook rewrites the launch.</p>
+<div class="flow">lead launches task + brief → Jev: use_case (15) + complexity (low|medium|high) → role (roles map) + table cell (model · effort) → subagent_type=&lt;role&gt;--&lt;effort&gt; + updatedInput.model</div>
+<div class="tw"><table>
+<tr><th>Alias</th><th>Model</th><th class="num">$/M in</th><th class="num">$/M out</th><th class="num">$/M cache</th><th>Effort (modelSettings)</th><th>Used for</th></tr>
+<tr><td><code>luna</code></td><td>gpt-6-luna</td><td class="num">0.10</td><td class="num">0.50</td><td class="num">0.01</td><td>low</td><td>text: summaries, docs</td></tr>
+<tr><td><code>flash</code></td><td>fireworks/deepseek-v4.1-flash</td><td class="num">0.22</td><td class="num">0.66</td><td class="num">0.01</td><td>high</td><td>cheap agentic work, primary</td></tr>
+<tr><td><code>pro</code></td><td>fireworks/deepseek-v4-pro</td><td class="num">1.32</td><td class="num">3.96</td><td class="num">0.04</td><td>medium</td><td>implementation with judgement</td></tr>
+<tr><td><code>sol</code></td><td>gpt-6-sol</td><td class="num">2.00</td><td class="num">10.00</td><td class="num">0.20</td><td>high</td><td>plans, reviews, hard implementation</td></tr>
+<tr><td><code>opus</code></td><td>claude-opus-5-5</td><td class="num">4.00</td><td class="num">20.00</td><td class="num">0.20</td><td>high</td><td>security, architecture, root cause, migrations</td></tr>
+</table></div>
+<h3>router.json (all keys optional; defaults live in the hook)</h3>
+<div class="tw"><table>
+<tr><th>Key</th><th>Now</th><th>Meaning</th></tr>
+<tr><td><code>mode</code></td><td><code>enforce</code></td><td><code>off</code> · <code>shadow</code> (log only) · <code>enforce</code> (rewrite subagent_type to the role variant)</td></tr>
+<tr><td><code>classifier</code></td><td><code>jev</code></td><td><code>rules</code> (keywords) · <code>jev</code> · <code>both</code> (ask Jev, apply rules)</td></tr>
+<tr><td><code>effortMode</code></td><td><code>variant</code></td><td><code>variant</code> swaps to <code>&lt;role&gt;--&lt;alias&gt;-&lt;effort&gt;</code> · <code>log</code> only records</td></tr>
+<tr><td><code>placeholder</code></td><td><code>task</code></td><td>Launches of this agent always get a role assigned (implied by the use case; a brief with no signal → Explore)</td></tr>
+<tr><td><code>intentMode</code> · <code>bashGuardMode</code></td><td><code>on</code></td><td>The two hooks below; <code>off</code> disables without uninstalling</td></tr>
+<tr><td><code>roleMode</code> · <code>roles</code></td><td><code>enforce</code></td><td>When the lead names a specialist but Jev's use case (confidence ≥ jevMinConfidence) implies another of your roles, rewrite it. <code>log</code> only records. Map: Explore ← explore, explain · investigator ← status, debug · planner ← plan, architecture · implementer ← implement, bugfix, refactor, tests, migration, cicd, docs · reviewer ← review, security</td></tr>
+<tr><td><code>jevHighThreshold</code></td><td>0.65</td><td>P(high) needed to accept "high"; clear cases score 1.00, doubtful plans ~0.60</td></tr>
+<tr><td><code>jevMinConfidence</code></td><td>0.6</td><td>Below it for use_case, the keyword rules decide</td></tr>
+<tr><td><code>shuntMode</code> · <code>shuntMinLines</code> · <code>shuntAliases</code> · <code>shuntModel</code></td><td><code>on</code> · 350 · pro,sol,opus · flash</td><td>Read shunt: which agents (by variant alias) may not Read big files whole, and which cheap model reads (and writes, for code-write) for them</td></tr>
+<tr><td><code>codeWriteAgents</code></td><td><code>^implementer--(pro|sol)-</code></td><td>Regex of agents allowed to run code-write (checked by bash-guard)</td></tr>
+<tr><td><code>models</code>, <code>useCases</code>, <code>jevCriteria</code></td><td>defaults</td><td>Override aliases, table cells (<code>useCases.&lt;case&gt;.levels.&lt;cx&gt; = [alias, effort]</code>) or the complexity criteria</td></tr>
+</table></div>
+<pre><button class="copy" data-copy>copy</button><code>node ~/.claude/hooks/model-router.mjs --criteria      <span class="c"># the table + criteria Jev receives</span>
+node ~/.claude/hooks/model-router.mjs --report [days] <span class="c"># per case/complexity, roles assigned, effort applied, Jev vs rules, errors</span>
+node ~/.claude/tools/jev-tune.mjs                     <span class="c"># bench: 15 tasks, expected vs Jev (12/15 with "tuned")</span>
+node ~/.claude/hooks/log-agent-launch.mjs --tail 5    <span class="c"># raw launches (debug)</span>
+node ~/.claude/hooks/read-shunt.mjs --report [days]   <span class="c"># reads shunted, bulk-read tokens/cost, est. savings</span>
+node ~/.claude/tools/bulk-read.mjs "question" src/**/*.ts <span class="c"># what the agents run (works from any shell)</span>
+node ~/.claude/tools/code-write.mjs --report [days]   <span class="c"># generated files: kept vs edited afterwards, cost</span>
+tail -1 ~/.claude/logs/model-router.jsonl             <span class="c"># last decision</span></code></pre>
+<h3>Intent router &amp; Bash guard (plain <code>claude</code> sessions only; aircode sessions are skipped)</h3>
+<div class="tw"><table>
+<tr><th>Hook</th><th>When</th><th>Jev question</th><th>Effect</th></tr>
+<tr><td><code>intent-router.mjs</code></td><td>UserPromptSubmit: every message you type (not commands, not <code>!</code>, not &lt; 12 chars)</td><td><code>intent</code> ∈ review_mr · plan · implement · investigate · explain · docs · git · question · other, and <code>skill</code> among the skills installed (user + project) or none</td><td>Injects one line of routing context for the turn: "run /review-mr …", "delegate as plan: …", "load skill glab". Below <code>intentMinConfidence</code> (0.5) nothing is injected.</td></tr>
+<tr><td><code>bash-guard.mjs</code></td><td>PreToolUse Bash, only when the command has risky tokens (rm, mv, git push/reset/branch -D, glab writes, aws/kubectl/terraform mutations, redirections, sudo…)</td><td><code>effect</code> ∈ read · write · destructive</td><td>destructive (≥ 0.6) → denied with a reason; the agent must ask you. Everything else passes. Fail-open on Jev errors.</td></tr>
+</table></div>
+<pre><button class="copy" data-copy>copy</button><code>node ~/.claude/hooks/intent-router.mjs --report     <span class="c"># intents, skills, skipped, latency, last prompts</span>
+node ~/.claude/hooks/bash-guard.mjs --report        <span class="c"># risky commands checked, denied list</span></code></pre>
+<p>Rules of thumb baked into the table: effort follows complexity, not the model; <code>max</code> only in the 4 critical cells; cheap models never at high effort for long work; Kimi K3 dropped (same agentic cost as Opus 5.5, no evidence it is better); Sol = Sonnet 5 price, chosen for tool use.</p>
+</section>
+
+<section id="table">
+<h2><span class="n">4</span>Use-case table (model · effort)</h2>
+<div class="tw"><table>
+<tr><th>Use case</th><th>Low</th><th>Medium</th><th>High</th></tr>
+<tr><td>explore</td><td>flash · low</td><td>flash · medium</td><td>pro · medium</td></tr>
+<tr><td>explain</td><td>luna · low</td><td>luna · medium</td><td>sol · medium</td></tr>
+<tr><td>status</td><td>flash · low</td><td>flash · low</td><td>pro · medium</td></tr>
+<tr><td>plan</td><td>sol · medium</td><td>sol · high</td><td>opus · high</td></tr>
+<tr><td>architecture</td><td>sol · high</td><td>opus · high</td><td>opus · max</td></tr>
+<tr><td>implement</td><td>flash · medium</td><td>pro · medium</td><td>sol · high</td></tr>
+<tr><td>bugfix</td><td>flash · medium</td><td>pro · high</td><td>sol · high</td></tr>
+<tr><td>refactor</td><td>flash · medium</td><td>pro · medium</td><td>sol · high</td></tr>
+<tr><td>tests</td><td>flash · low</td><td>pro · medium</td><td>pro · high</td></tr>
+<tr><td>review</td><td>sol · medium</td><td>sol · high</td><td>opus · high</td></tr>
+<tr><td>security</td><td>sol · high</td><td>opus · high</td><td>opus · max</td></tr>
+<tr><td>debug</td><td>pro · medium</td><td>sol · high</td><td>opus · max</td></tr>
+<tr><td>migration</td><td>pro · medium</td><td>sol · high</td><td>opus · max</td></tr>
+<tr><td>docs</td><td>luna · low</td><td>luna · medium</td><td>sol · medium</td></tr>
+<tr><td>cicd</td><td>flash · low</td><td>pro · medium</td><td>sol · high</td></tr>
+</table></div>
+<p>Complexity criteria (sent to Jev): <strong>low</strong> = the place to change is identified (failing test, file, function) or a single read-only command; mechanical changes are low even across many files. <strong>medium</strong> = clear goal, code must be found or understood first, a few files, no production/data risk. <strong>high</strong> = ambiguous, several services, or correctness-critical (production data, money, auth, data loss, security, unknown cause).</p>
+</section>
+
+<section id="git">
+<h2><span class="n">5</span>Git workflow</h2>
+<div class="grid">
+<div class="box"><h4>claude @ticket &lt;T&gt; [slug]</h4><ul><li><code>git fetch --prune origin</code></li><li>Fast-forward local <code>main</code> to <code>origin/main</code> (refuses on divergence)</li><li>Worktree <code>../&lt;repo&gt;.wt/&lt;T&gt;</code> on <code>feat/&lt;T&gt;[-slug]</code> from <code>origin/main</code>; reuses an existing branch or worktree</li><li>Copies gitignored files listed in <code>&lt;repo&gt;/.worktreeinclude</code> (e.g. <code>.env</code>)</li><li>Starts claude inside</li></ul></div>
+<div class="box"><h4>guard-branch hook</h4><ul><li>PreToolUse on Edit/Write/NotebookEdit</li><li>Denies edits on <code>main</code>/<code>master</code> or in the main working tree; the agent gets the reason</li><li>No-op outside a git repo; <code>GUARD_BRANCH=off</code> for one session</li><li>Config: <code>~/.claude/guard-branch.json</code> (<code>protected</code>, <code>requireWorktree</code>)</li></ul></div>
+<div class="box"><h4>deny rules (settings.json)</h4><ul><li><code>git push --force</code> / <code>-f</code>, <code>git branch -D</code>, <code>git checkout|switch main</code></li><li><code>rm -rf /</code>, <code>rm -rf ~</code></li><li><code>glab mr approve|merge|close|update</code></li><li><code>aws-vault</code> with prod profiles stays allowed on purpose</li></ul></div>
+</div>
+<pre><button class="copy" data-copy>copy</button><code>git worktree list                                   <span class="c"># what is checked out where</span>
+git worktree remove ../conv-ai-settings.wt/APR-1234  <span class="c"># after the MR is merged</span></code></pre>
+</section>
+
+<section id="review">
+<h2><span class="n">6</span>MR review</h2>
+<pre><button class="copy" data-copy>copy</button><code>/review-mr !123                <span class="c"># someone else's MR: blockers, posted inline · your own MR: full, chat only + offer to fix</span>
+/review-mr !123 --full         <span class="c"># force full (+ Minor, Question, Suggestion) · --blockers forces blockers</span>
+/review-mr !123 --spec         <span class="c"># also compare with the OpenSpec change</span>
+/review-mr [--post|--no-post]  <span class="c"># current branch vs main; --post/--no-post override the own/other default</span>
+/review-mr https://gitlab.com/aircall/.../-/merge_requests/123   <span class="c"># from any folder</span></code></pre>
+<div class="flow">target → mr-checkout.sh (URL: find/clone repo under ~/development, worktree ../&lt;repo&gt;.wt/mr-&lt;iid&gt;) → reviewer (JSON) → chat summary → mr-post.mjs → one inline discussion per finding</div>
+<div class="grid">
+<div class="box"><h4>What gets posted</h4><ul><li>Only inline discussions on <code>path:line</code> in Changes; no general notes. Verdict and summary stay in the chat.</li><li>Body: <code>**Severity** — message</code> + "Proposed fix" snippet + hidden marker <code>&lt;!-- cc-review:hash --&gt;</code></li><li>Re-runs skip findings already posted (marker). Lines outside the diff move to the nearest diff line ("about line N"); files outside the diff are reported as <code>not_posted</code>.</li></ul></div>
+<div class="box"><h4>Style (reviewer prompt)</h4><ul><li>English B1, short, direct, actionable, one idea per finding</li><li>Humble, as a question or proposal: "Could we…?", "Would Z work?"</li><li>No praise, no restating the diff, no "nit:"; ≤ 12 findings</li><li>Never <code>glab mr note|approve|merge|update</code></li></ul></div>
+</div>
+</section>
+
+<section id="cost">
+<h2><span class="n">7</span>Costs &amp; monitoring</h2>
+<div class="note">Claude Code's own <code>$</code> (<code>/usage</code>, <code>--output-format json</code>) is only right for Anthropic ids. For gateway models it logs <code>unrecognized_model</code> and inflates ×3–×24. <strong><code>cc-cost</code> and the statusline are the reference</strong>: they price from <code>~/.claude/pricing.json</code> (209 entries: 79 models, with and without provider prefix; lookup exact → without date suffix → without provider).</div>
+<h3>Statusline</h3>
+<div class="tw"><table>
+<tr><th>Line</th><th>Shows</th></tr>
+<tr><td>1</td><td>agent · model (effort) · context bar · real $ (cc $ native) · duration</td></tr>
+<tr><td>2</td><td>repo · git:branch · worktree · lines changed · cache · openspec count</td></tr>
+<tr><td>3</td><td>subagents with real $ each (the agent actually launched, from the router log) · tools · skills</td></tr>
+<tr><td>4+</td><td>▶ live subagents: type, model, ctx, calls, out, $, elapsed, last tool (variants shown under their base name)</td></tr>
+</table></div>
+<pre><button class="copy" data-copy>copy</button><code>cc-cost                          <span class="c"># current/last session: summary, by agent, context growth, cache breaks, tools, findings</span>
+cc-cost --days 7 --all           <span class="c"># range: by branch/day/session with models column</span>
+cc-cost --session &lt;id&gt; --top     <span class="c"># deep dive, top calls</span>
+cc-cost --include ~/.claude-work <span class="c"># also the sessions VS Code saved there by mistake</span>
+bash ~/.claude/tools/gateway-smoke.sh [model]   <span class="c"># tool round-trip + cache_read through the gateway (verified: flash, sol, opus)</span></code></pre>
+<p>Floor per API call is ~14k input tokens (system prompt + tools): ~$0.0002 on Flash with cache, ~$0.003 on Opus. That is why the primary stays on Flash and strong models are reserved for subagents. Langfuse (gateway side) is the source of truth for billing; Jev calls go through your own LLM Gateway org, not Aircall's traces.</p>
+</section>
+
+<section id="files">
+<h2><span class="n">8</span>Files</h2>
+<div class="grid">
+<div class="box"><h4>~/.claude (live)</h4><ul>
+<li><code>settings.json</code>: agent lead, hooks, modelSettings, modelPicker, permissions (bypass + deny), statusLine</li>
+<li><code>CLAUDE.md</code>: cost &amp; delegation, subagent table, git workflow, OpenSpec, GitLab/Jira, gateway</li>
+<li><code>aircall-gateway.env</code>: ANTHROPIC_BASE_URL, DEFAULT_*_MODEL, SUBAGENT_MODEL, MAX_CONTEXT 400k, MAX_CONCURRENT_SUBAGENTS 3, SPAWN_DEPTH 1</li>
+<li><code>router.json</code> · <code>models.json</code> · <code>pricing.json</code> · <code>guard-branch.json</code></li>
+<li><code>agents/</code>: lead, solo, task, Explore, investigator, planner, implementer, reviewer + 50 variants</li>
+<li><code>commands/</code>: review-mr, ticket, ship, opsx/*</li>
+<li><code>hooks/</code>: model-router, intent-router, bash-guard, read-shunt, ship-gates, guard-branch, log-agent-launch, log-subagent</li>
+<li><code>templates/</code>: mr.md · <code>knowledge/</code>: index, lessons, process, relations</li>
+<li><code>tools/</code>: cc-cost, cc-models, cc-ticket, cc-wtbase, mr-checkout, mr-post, bulk-read, code-write, ship-state, gen-effort-variants, jev-tune, gateway-smoke</li>
+<li><code>skills/</code>: bulk-read, code-write (+ project skills)</li>
+<li><code>logs/</code>: model-router, intent-router, bash-guard, read-shunt, code-write, agent-launches, subagents, session-costs (.jsonl)</li>
+</ul></div>
+<div class="box"><h4>~/.claude-work (staging + installers)</h4><ul>
+<li><code>install-gateway-models.sh</code>: prices, groups, cc-models, claude wrapper</li>
+<li><code>setup-jev-router.sh</code>: Jev key → ~/.zshrc, hooks, router.json</li>
+<li><code>apply-router-usecases.sh</code>: 15-case router</li>
+<li><code>apply-review-mr.sh</code>: /review-mr, reviewer, mr-post, mr-checkout</li>
+<li><code>apply-worktree-guard.sh</code>: @ticket, guard hook</li>
+<li><code>apply-model-picker.sh [--all]</code> · <code>apply-pick.sh</code> (@pick, fzf)</li>
+<li><code>apply-sota.sh</code>: modelSettings, deny, 5 agents, CLAUDE.md, variants, tools</li>
+<li><code>apply-variants-v2.sh</code>: router without <code>model</code> rewrite, 50 model·effort variants, lead rule "no retries"</li>
+<li><code>apply-shunt.sh</code>: read-shunt hook, bulk-read tool + skill, "Reading cheaply" in investigator/planner/reviewer, cc-cost rows</li>
+<li><code>apply-codewrite.sh</code>: code-write tool + skill, bash-guard gate, implementer section</li>
+<li><code>apply-builtins.sh</code> · <code>apply-switch.sh</code> (/ticket, --add-dir worktrees) · <code>apply-review-own.sh</code> · <code>apply-ship.sh</code> (/ship, state, gates, contracts, knowledge)</li>
+<li><code>apply-lead.sh</code>: lead/solo primaries, @solo · <code>apply-task.sh</code>: task entry point, role check · <code>apply-intent.sh</code>: intent router + bash guard</li>
+<li>All idempotent; each backs up what it touches (<code>*.bak-&lt;ts&gt;</code>, <code>backups/</code>)</li>
+</ul></div>
+</div>
+<p>Key locations: gateway key in <code>~/.aircode/config.json</code> (read live), Jev key as <code>JEV_LLMGATEWAY_KEY</code> in <code>~/.zshrc</code>. Never in <code>router.json</code> or <code>settings.json</code>.</p>
+</section>
+
+<section id="trouble">
+<h2><span class="n">9</span>Troubleshooting</h2>
+<div class="tw"><table>
+<tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+<tr><td>Session shows Sonnet, no statusline, "manual mode"</td><td><code>CLAUDE_CONFIG_DIR</code> pointing elsewhere (VS Code inherited it)</td><td><code>echo $CLAUDE_CONFIG_DIR</code> in the integrated terminal; quit VS Code fully (<kbd>⌘Q</kbd>) and reopen</td></tr>
+<tr><td>"configuration file not found at ~/.claude/.claude.json"</td><td><code>CLAUDE_CONFIG_DIR</code> set to <code>~/.claude</code></td><td>Unset it (the wrapper does); don't restore the backup</td></tr>
+<tr><td>Router log: <code>no JEV_LLMGATEWAY_KEY in environment</code></td><td>Shell not reloaded</td><td><code>source ~/.zshrc</code>, new session</td></tr>
+<tr><td>Router log: <code>HTTP 402</code></td><td>No credit on the Jev key's LLM Gateway org</td><td>Top up; meanwhile rules decide</td></tr>
+<tr><td>Subagent stopped at turn limit</td><td>Task too big for its <code>maxTurns</code>, or a plugin agent (explore: 8 turns, no Bash)</td><td>Use the named subagent (<code>investigator</code> for CLI work); raise maxTurns in the agent file</td></tr>
+<tr><td>"PreToolUse hook for Agent returned updatedInput that failed schema validation … path [model]" / subagents end with 0 tool uses</td><td>A hook put a gateway id in <code>model</code>; the Agent tool only accepts <code>sonnet|opus|haiku|fable</code></td><td><code>bash ~/.claude-work/apply-variants-v2.sh</code> (router ≥ v2 never rewrites <code>model</code>; variants carry it), restart claude</td></tr>
+<tr><td>Read denied "read-shunt: … has N lines and you run on an expensive model"</td><td>Intended: the agent runs on sol/opus/pro and asked for a file &gt; 350 lines whole</td><td>The agent should run the printed <code>bulk-read</code> command or Read a window (offset+limit). To disable: <code>"shuntMode": "off"</code> in router.json</td></tr>
+<tr><td>code-write denied by bash-guard / "refusing to write on branch main"</td><td>Only <code>implementer--pro|sol-*</code> may run it, and only in a ticket worktree</td><td>Intended. The agent writes the file itself with Write/Edit, or the work moves to a worktree</td></tr>
+<tr><td>bulk-read: "no gateway key"</td><td>Run outside a claude session without <code>~/.aircode/config.json</code></td><td>Run inside a session (wrapper sets ANTHROPIC_AUTH_TOKEN) or keep the aircode config</td></tr>
+<tr><td>Bash asks to confirm <code>glab api …</code> despite bypass</td><td>An <code>ask</code> rule <code>Bash(glab api:*)</code> in ~/.claude/settings.json (ask beats allow)</td><td>Remove it; bash-guard still classifies <code>glab api -X POST|PUT|DELETE</code></td></tr>
+<tr><td>The lead works on another ticket with <code>git -C</code> / <code>cd … &amp;&amp;</code> prefixes</td><td>A session cannot change worktree: the shell's <code>cd</code> does not persist between Bash calls, and hooks, HUD and the implementer's worktree follow the session directory</td><td>Stop; <code>claude @ticket &lt;T&gt;</code> in a new terminal (state on disk resumes: <code>/ship &lt;T&gt;</code>)</td></tr>
+<tr><td>Edit denied "refusing to edit files on branch main"</td><td>guard-branch</td><td><code>claude @ticket &lt;T&gt;</code>, or <code>GUARD_BRANCH=off claude</code></td></tr>
+<tr><td><code>@pick</code>: fzf not installed</td><td>—</td><td><code>brew install fzf</code></td></tr>
+<tr><td>Native $ looks huge</td><td><code>unrecognized_model</code> pricing</td><td>Ignore; use <code>cc-cost</code></td></tr>
+<tr><td>Review comments repeated</td><td>Old mr-post</td><td>Re-run <code>apply-sota.sh</code> (marker dedupe)</td></tr>
+<tr><td>aircode session ignores your agents</td><td>aircode's <code>build</code> prompt: "do not delegate to native agents"</td><td>Use <code>claude</code>; or <code>harness.claude.disabled_subagents</code> in <code>~/.aircode/config.json</code></td></tr>
+</table></div>
+</section>
+
+<section id="security">
+<h2><span class="n">10</span>Security &amp; conventions</h2>
+<div class="grid">
+<div class="box"><h4>Keys</h4><ul><li>Only in env vars / aircode config; never in JSON config files</li><li>Rotate any key that was pasted in a chat (two LLM Gateway keys and the aircode key were)</li><li><code>~/.aircode/config.json.bak-*</code> contains a plaintext key: delete after rotating</li></ul></div>
+<div class="box"><h4>Permissions</h4><ul><li><code>bypassPermissions</code> is on; deny rules are the hard guarantees; guard-branch covers edits</li><li>"auto" mode is not available with non-Anthropic models via gateway</li><li>Writes to GitLab/Jira beyond <code>/review-mr</code> need confirmation in chat</li></ul></div>
+<div class="box"><h4>Conventions</h4><ul><li>Everything configured is in English</li><li>Gateway ids only, never <code>haiku/sonnet/opus</code> aliases</li><li>Subagents return summaries, never diffs; implement → review ≤ 2 rounds</li><li>Briefs start with the kind of work (read-only / lookup / plan / change / review): it is what the router classifies</li><li>Change one model alias in <code>router.json models</code> to A/B it across all its cells; measure with <code>cc-cost</code> before changing the table</li></ul></div>
+</div>
+</section>
+
+</main>
+
+<section id="sdlc">
+<h2><span class="n">11</span>Agentic SDLC · <code>/ship</code> (phase 1)</h2>
+<p>The full design (three levels: <code>/design</code> → <code>/plan</code> → <code>/ship</code>, knowledge layer, deciders, flow conditions) lives in the <a href="https://claude.ai/artifact/SERWtinBPaAPA8hHJ8r8x7">Agentic SDLC</a> artifact. Phase 1 implements the ticket loop.</p>
+<pre><button class="copy" data-copy>copy</button><code>/ship APR-1234                 <span class="c"># prepare → understand → plan → review-plan → implement → review-code → STOP → open MR → pipeline → review-mr → close+learn</span>
+/ship APR-1234 --status        <span class="c"># stage, attempts, verdicts, MR, cost</span>
+/ship APR-1234 --reset         <span class="c"># archive the state and start over · --from &lt;stage&gt; · --budget &lt;usd&gt;</span>
+node ~/.claude/tools/ship-state.mjs list | status | get APR-1234    <span class="c"># the state machine store (also what the hooks read)</span>
+node ~/.claude/tools/cc-cost.mjs --ticket APR-1234                  <span class="c"># spend attributed to the ticket (its worktree/branch sessions)</span></code></pre>
+<div class="grid">
+<div class="box"><h4>State</h4><ul><li><code>&lt;worktree&gt;/.claude/ship/&lt;T&gt;/state.json</code> (git-excluded): stage, attempts per gate, verdicts, MR, pipeline, cost, lessons, history. Plus <code>brief.md</code>, <code>plan.md</code>, <code>mr.md</code>.</li><li>Resumable: <code>/ship &lt;T&gt;</code> reads it first; a compaction or a new session does not lose the loop.</li><li>Runs only in a session started in the ticket's worktree; from elsewhere it prepares the worktree and stops with <code>claude @ticket &lt;T&gt;</code>.</li><li>HUD line 2: <code>ship:&lt;stage&gt;#&lt;attempt&gt; $cost/budget</code>, red with <code>STOP</code> when waiting for you.</li></ul></div>
+<div class="box"><h4>Gates and stops</h4><ul><li>Fact gates as hooks (<code>ship-gates.mjs</code>): implementer must report <code>Status: done · Tests … failed 0 · Lint: clean</code> (one bounce, then recorded); <code>glab mr create</code> / <code>git push</code> need <code>verdicts.code = APPROVE</code>.</li><li>Judgement gates: reviewer JSON (<code>review plan:</code>, code, MR); no Critical/Major to pass.</li><li>≤ 2 rounds per gate, ≈ $5 per ticket (<code>shipBudgetUsd</code>, <code>shipMaxAttempts</code>); beyond → STOP and ask.</li><li>Human STOPs: open questions (once), high-risk plan, before the MR, Jira writes, merge (always).</li></ul></div>
+<div class="box"><h4>Contracts</h4><ul><li>investigator <code>understand:</code> → Acceptance criteria, Touches, Open questions with defaults.</li><li>planner → <code>Risk</code>, <code>Files</code>, steps with <code>done when</code>, <code>Covers</code> (criterion → step).</li><li>reviewer <code>review plan:</code> → same JSON, <code>path: "plan"</code>, line = step.</li><li>Learn at close: ≤ 3 lessons → repo <code>docs/codebase-map.md</code> Gotchas (in the MR), <code>~/.claude/knowledge/lessons.md</code>, or <code>process.md</code> for <code>/retro</code>.</li></ul></div>
+</div>
+<p>Next phases: <code>/map</code> + knowledge index (2), <code>/plan</code> + <code>/epic</code> (3), <code>/design</code> (4), <code>/retro</code> (5).</p>
+</section>
+
+<footer>Sources: Claude Code docs (sub-agents, hooks, costs, model-config, worktrees, permission-modes), llmgateway.io model list 2026-09-23, gateway smoke tests run 2026-09-23.</footer>
+</div>
+
+<script>
+document.querySelectorAll('[data-copy]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const pre=b.parentElement, txt=pre.querySelector('code').innerText.replace(/^\s*#.*$/gm,'').replace(/\s+#.*$/gm,'').replace(/\n{2,}/g,'\n').trim();
+    const done=()=>{b.textContent='copied';setTimeout(()=>b.textContent='copy',1200);};
+    try{navigator.clipboard.writeText(txt).then(done).catch(()=>{const r=document.createRange();r.selectNodeContents(pre.querySelector('code'));const s=getSelection();s.removeAllRanges();s.addRange(r);});}catch{ }
+  });
+});
+</script>

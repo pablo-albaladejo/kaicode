@@ -1,0 +1,27 @@
+# whitelist: only the harness is versioned; everything else in ~/.claude-work is Claude Code runtime
+*
+!.gitignore
+!README.md
+!CLAUDE.md
+!CHEATSHEET.html
+!settings.json
+!router.json
+!pricing.json
+!models.json
+!statusline.mjs
+!cc-cost.mjs
+!*.sh
+!*.SKILL.md
+!agents/
+!agents/*.md
+agents/*--*.md
+!commands/
+!commands/**
+!hooks/
+!hooks/*
+!tools/
+!tools/*
+!templates/
+!templates/*
+!knowledge/
+!knowledge/*.md
