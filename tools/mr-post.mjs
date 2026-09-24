@@ -30,6 +30,10 @@ if (!/^\d+$/.test(mr)) { console.error("usage: mr-post.mjs --mr <iid|!iid|MR URL
 const project = repo ? encodeURIComponent(repo) : ":id"; // :id = project of the current repo (glab placeholder)
 const review = JSON.parse(fs.readFileSync(0, "utf8"));
 const api = (pathname, extra = []) => JSON.parse(execFileSync("glab", ["api", pathname, ...extra], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
+// POST with a real JSON body. `glab api -f "position[new_line]=…"` sends a JSON object with the literal key
+// "position[new_line]", which GitLab ignores — the discussion is then created as a plain note instead of an
+// inline one. Nested objects need a nested JSON body (--input -).
+const apiJson = (pathname, payload) => JSON.parse(execFileSync("glab", ["api", pathname, "-X", "POST", "-H", "Content-Type: application/json", "--input", "-"], { encoding: "utf8", input: JSON.stringify(payload), stdio: ["pipe", "pipe", "pipe"] }));
 
 // ── MR diff refs + diffs (all pages) ──────────────────────────────────
 const mrInfo = api(`projects/${project}/merge_requests/${mr}`);
@@ -65,7 +69,7 @@ for (let page = 1; page < 50; page++) {
 const marker = (f) => createHash("sha1").update(`${f.path}:${f.line}:${f.message}`).digest("hex").slice(0, 12);
 
 const fence = (f) => (f?.code ? `\n\nProposed fix:\n\`\`\`${f.lang || ""}\n${f.code.replace(/\n$/, "")}\n\`\`\`` : "");
-const post = (endpoint, fields) => dry ? { web_url: "(dry-run)" } : api(endpoint, ["-X", "POST", ...fields.flatMap(([k, v]) => ["-f", `${k}=${v}`])]);
+const post = (endpoint, payload) => dry ? (console.error(JSON.stringify(payload)), { web_url: "(dry-run)" }) : apiJson(endpoint, payload);
 
 const results = [], notPosted = [], skipped = [];
 for (const f of review.findings || []) {
@@ -78,13 +82,14 @@ for (const f of review.findings || []) {
     const near = [...file.lines.keys()].sort((a, b) => Math.abs(a - line) - Math.abs(b - line))[0];
     pos = file.lines.get(near); moved = ` _(about line ${line})_`; line = near;
   }
-  const body = `**${f.severity}**${moved} — ${f.message}${fence(f.fix)}\n\n<!-- cc-review:${h} -->`;
-  const fields = [["body", body], ["position[position_type]", "text"], ["position[base_sha]", refs.base_sha], ["position[head_sha]", refs.head_sha],
-    ["position[start_sha]", refs.start_sha], ["position[new_path]", f.path], ["position[old_path]", file.old_path || f.path], ["position[new_line]", String(pos.new_line)]];
-  if (pos.old_line != null) fields.push(["position[old_line]", String(pos.old_line)]);
+  const body = `**[${f.severity}]**${moved} ${f.message}${fence(f.fix)}\n\n<!-- cc-review:${h} -->`;
+  const position = { position_type: "text", base_sha: refs.base_sha, head_sha: refs.head_sha, start_sha: refs.start_sha, new_path: f.path, old_path: file.old_path || f.path, new_line: pos.new_line };
+  if (pos.old_line != null) position.old_line = pos.old_line;
   try {
-    const r = post(`projects/${project}/merge_requests/${mr}/discussions`, fields);
-    results.push({ path: f.path, line, severity: f.severity, url: r?.notes?.[0]?.id ? `${mrInfo.web_url}#note_${r.notes[0].id}` : r.web_url || "posted" });
+    const r = post(`projects/${project}/merge_requests/${mr}/discussions`, { body, position });
+    const inline = dry || !!r?.notes?.[0]?.position; // GitLab answers with the position when it anchored the note
+    if (!inline) { notPosted.push({ path: f.path, line: f.line, severity: f.severity, reason: "GitLab created it as a general note (no position in the answer)" }); }
+    results.push({ path: f.path, line, severity: f.severity, inline, url: r?.notes?.[0]?.id ? `${mrInfo.web_url}#note_${r.notes[0].id}` : r.web_url || "posted" });
   } catch (e) { notPosted.push({ path: f.path, line: f.line, severity: f.severity, reason: String(e.stderr || e.message).slice(0, 160) }); }
 }
 console.log(JSON.stringify({ mr: mrInfo.web_url, posted: results, skipped_already_posted: skipped, not_posted: notPosted, dry_run: dry }, null, 1));

@@ -9,12 +9,13 @@ SRC="$HOME/.claude-work"; DST="$HOME/.claude"; TS=$(date +%Y%m%d-%H%M%S)
 NODE="$(command -v node)"; ok(){ printf '  \033[32m✓\033[0m %s\n' "$*"; }
 mkdir -p "$DST/commands" "$DST/tools" "$DST/hooks" "$DST/templates" "$DST/knowledge"
 cp "$SRC/commands/ship.md" "$DST/commands/ship.md";                 ok "commands/ship.md"
-cp "$SRC/tools/ship-state.mjs" "$DST/tools/ship-state.mjs"; cp "$SRC/tools/ship-inventory.sh" "$DST/tools/ship-inventory.sh"; ok "tools/ship-state.mjs · tools/ship-inventory.sh"
+cp "$SRC/tools/ship-state.mjs" "$DST/tools/ship-state.mjs"; cp "$SRC/tools/ship-inventory.sh" "$DST/tools/ship-inventory.sh"; cp "$SRC/tools/ci-wait.sh" "$DST/tools/ci-wait.sh"; cp "$SRC/tools/gateway-probe.sh" "$DST/tools/gateway-probe.sh"; ok "tools/ship-state.mjs · ship-inventory.sh · ci-wait.sh (pipeline stage without a model) · gateway-probe.sh"
 cp "$SRC/hooks/ship-gates.mjs" "$DST/hooks/ship-gates.mjs";         ok "hooks/ship-gates.mjs"
 cp "$SRC/hooks/log-subagent.mjs" "$DST/hooks/log-subagent.mjs";     ok "hooks/log-subagent.mjs (duration + model per finished subagent → HUD ETAs)"
 cp "$SRC/templates/mr.md" "$DST/templates/mr.md";                   ok "templates/mr.md"
 for f in index lessons process relations; do [ -f "$DST/knowledge/$f.md" ] || cp "$SRC/knowledge/$f.md" "$DST/knowledge/$f.md"; done; ok "knowledge/ (index · lessons · process · relations; existing files kept)"
-for a in investigator planner reviewer; do cp "$SRC/agents/$a.md" "$DST/agents/$a.md"; done; ok "agents: investigator understand: · planner Risk/Files/Covers · reviewer review plan:"
+for a in investigator planner reviewer implementer; do cp "$SRC/agents/$a.md" "$DST/agents/$a.md"; done; ok "agents: investigator understand: · planner Risk/Files/Covers · reviewer review plan: · implementer without worktree isolation"
+cp "$SRC/agents/lead.md" "$DST/agents/lead.md"; cp "$SRC/hooks/bash-guard.mjs" "$DST/hooks/bash-guard.mjs"; cp "$SRC/tools/mr-post.mjs" "$DST/tools/mr-post.mjs"; ok "agents/lead.md (decide, don't ask · facts are command output) · bash-guard (narrow deny + CC_CONFIRMED) · mr-post ([Severity], inline JSON body)"
 cp "$DST/hooks/model-router.mjs" "$DST/hooks/model-router.mjs.bak-$TS"; cp "$SRC/hooks/model-router.mjs" "$DST/hooks/model-router.mjs"; ok "hooks/model-router.mjs (status use case also covers understand:)"
 cp "$SRC/tools/cc-cost.mjs" "$DST/tools/cc-cost.mjs"; cp "$SRC/statusline.mjs" "$DST/statusline.mjs"; ok "cc-cost --ticket <T> · statusline ship:<stage>"
 cp "$DST/settings.json" "$DST/settings.json.bak-$TS"
@@ -31,8 +32,11 @@ if(!JSON.stringify(d.hooks.SubagentStop).includes("ship-gates.mjs"))
 d.hooks.PreToolUse??=[];
 if(!JSON.stringify(d.hooks.PreToolUse).includes("ship-gates.mjs"))
   d.hooks.PreToolUse.push({matcher:"Bash",hooks:[{type:"command",command:`${node} ${home}/.claude/hooks/ship-gates.mjs`,timeout:5}]});
+d.hooks.PostToolUse??=[];
+if(!JSON.stringify(d.hooks.PostToolUse).includes("ship-gates.mjs"))
+  d.hooks.PostToolUse.push({matcher:"Bash",hooks:[{type:"command",command:`${node} ${home}/.claude/hooks/ship-gates.mjs`,timeout:5}]});
 fs.writeFileSync(p,JSON.stringify(d,null,2)+"\n");
-console.log("  \u001b[32m✓\u001b[0m settings.json: SubagentStop → log-subagent.mjs + ship-gates · PreToolUse(Bash) → ship-gates (backup .bak-"+process.argv[3]+")");' "$DST/settings.json" "$NODE" "$TS"
+console.log("  \u001b[32m✓\u001b[0m settings.json: SubagentStop → log-subagent.mjs + ship-gates · PreToolUse(Bash) → ship-gates · PostToolUse(Bash) → ship-gates records the MR (backup .bak-"+process.argv[3]+")");' "$DST/settings.json" "$NODE" "$TS"
 "$NODE" -e '
 const fs=require("fs"),p=process.argv[1]; const d=JSON.parse(fs.readFileSync(p,"utf8"));
 d.shipBudgetUsd??=5; d.shipMaxAttempts??=2;

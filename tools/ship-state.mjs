@@ -65,9 +65,13 @@ switch (cmd) {
     const t = resolveTicket(rest[0]); const st = rest[1] || die("usage: ship-state stage <T> <stage> [note]");
     if (!STAGES.includes(st)) die(`unknown stage ${st}; one of ${STAGES.join(" ")}`);
     const s = load(t); const from = s.stage;
-    // duration of the stage we are leaving (since it was entered, minus nothing: human waits are recorded as their own stages)
+    // duration of the stage we are leaving: since it was entered, minus the time spent in a STOP (a STOP lasts until the
+    // next recorded event — verdict, attempt, stage… — so human waits do not inflate the stage medians the HUD ETA uses)
     const entered = [...s.history].reverse().find((h) => h.event && h.event.endsWith(`→ ${from}`))?.ts || (from === "prepare" ? s.created : null);
-    const seconds = entered ? Math.round((Date.now() - new Date(entered).getTime()) / 1000) : null;
+    let seconds = null;
+    if (entered) { const t0 = new Date(entered).getTime(); let waited = 0; const H = s.history.filter((h) => new Date(h.ts).getTime() >= t0);
+      H.forEach((h, i) => { if (h.event === "STOP") waited += (H[i + 1] ? new Date(H[i + 1].ts).getTime() : Date.now()) - new Date(h.ts).getTime(); });
+      seconds = Math.max(0, Math.round((Date.now() - t0 - waited) / 1000)); }
     s.stage = st; s.stopped = null; hist(s, `stage ${from} → ${st}`, rest.slice(2).join(" ")); save(s);
     if (from !== st) try { const L = path.join(CFG_DIR, "logs", "ship-stages.jsonl"); fs.mkdirSync(path.dirname(L), { recursive: true }); fs.appendFileSync(L, JSON.stringify({ ts: now(), ticket: t, repo: s.repo, stage: from, to: st, seconds, attempts: s.attempts[from] ?? null }) + "\n"); } catch {}
     console.log(`${t}: ${from} → ${st}${seconds != null ? ` (${from} took ${Math.round(seconds / 60)}m)` : ""}`); break;

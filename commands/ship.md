@@ -14,6 +14,7 @@ Conventions used in every stage:
 - **Budget** = after every stage: `ship-state cost <T>` (exit 2 ⇒ STOP with the amount).
 - A subagent output that does not match its format counts as a failed gate. Do not "read between the lines".
 - A hook `deny` is terminal for that stage: report its text verbatim, do not work around it.
+- **Only STOPs are questions.** Between two STOPs the loop runs on its own: after a resolved STOP or a passed gate, go to the next stage without asking. Housekeeping on the unpushed branch (reword `wip` messages, squash fixups, rebase) and corrections to `.claude/ship/<T>/*` (plan prose proven wrong by a measurement) are the lead's calls: do them, say so in one line. The user decides plans (gate-human), the MR (stop-mr), Jira comments and merges — nothing else.
 - **Briefs are the contract.** Send each stage's brief as written below, filled in; do not add extra asks ("also verify X against the real files", "also check Y"). If something must be verified, it belongs to the stage whose job that is (facts → understand/investigator, code → review-code). An inflated brief turns a 3-minute plan review into a 15-minute audit.
 
 ## 0. Arguments and resume
@@ -48,11 +49,12 @@ git rev-parse --show-toplevel                   # where THIS session lives
   > The worktree for <T> is ready at <path>. This loop must run in a session started there. Open a terminal and run: `claude @ticket <T>` then `/ship <T>` — it resumes from the saved state. Nothing else was changed.
   Never continue from here with `cd <path> && …` prefixes: subagents and hooks would still act on this worktree.
 Gate: `cc-ticket` exit 0 and `git status --porcelain` empty (untracked files are fine). Divergence or dirty tree ⇒ STOP (show `git status -sb`).
+Map: `node ~/.claude/tools/repo-map.mjs` (prints `fresh:` and costs nothing when a map exists; builds one for ~$0.05 otherwise). Every later brief says "start from the map".
 If a spec exists for this ticket — `openspec/changes/<slug>/` or `.claude/ship/<T>/spec.md` (written by `/plan`) — record it: `ship-state set <T> spec="<path>"`. (`openspec/` is often untracked: a new worktree does not inherit it; that is fine, it is optional.)
 `ship-state stage <T> understand`.
 
 ## 2. understand
-Launch: `understand: <T>. Read the ticket (acli jira workitem view <T>, or the spec at <spec path> if set), the code it touches (start from docs/codebase-map.md if present, ~/.claude/knowledge/index.md and lessons.md for this repo; bulk-read for anything big), nearby tests and related merged MRs. Return the understand format: Summary, Acceptance (testable criteria), Touches, Open questions with defaults, Sources.`
+Launch: `understand: <T>. Read the ticket (acli jira workitem view <T>, or the spec at <spec path> if set), the code it touches (start from the codebase map: docs/codebase-map.md or ~/.claude/knowledge/repos/<repo>.md, plus ~/.claude/knowledge/lessons.md lines for this repo; bulk-read for anything big), nearby tests and related merged MRs. Return the understand format: Summary, Acceptance (testable criteria), Touches, Open questions with defaults, Sources.`
 Gate: output has `Mode: understand` and ≥ 1 `Acceptance` line. Otherwise ⇒ `attempt understand`; second failure ⇒ STOP.
 Save: `ship-state set <T> 'acceptance=<JSON array of the criteria>'` and write the whole output to `.claude/ship/<T>/brief.md` (`cat > … <<'EOF'`).
 Open questions: if any has no reasonable default, ask the user **once** (all questions in one message) and wait; with answers (or "assume"), append them to brief.md. Never ask twice.
@@ -75,6 +77,7 @@ Human gate: if `plan.risk == high` or `plan.files > 15` ⇒ `ship-state stage <T
 ## 5. implement
 Launch **one implementer run for the whole plan**. Split into several runs only when the plan has more than 6 steps, or when the planner marked groups of steps as independent (different modules/services); then one run per group, in order, each with its own gate. `Risk: high` does **not** split the work: the risk is covered by the plan approval and the reviews, not by fragmentation (which multiplies full test-suite runs and cold contexts). Tell the implementer to run the tests of the files it touches while iterating and the full relevant suite plus the linter once at the end.
 `change: <T>. Plan: <plan.md or the spec tasks>. Step(s): <which>. acceptance: <criteria>. Work TDD: for each step write or extend the test, see it fail, implement, see it pass; run the full relevant suite and the linter at the end. Commit on this branch with conventional messages. Return the implementer format exactly (Status, Branch, Commits, Changed, Tests: <cmd> → passed X / failed Y, Lint, Notes). Never push.`
+Where did the commits land? The implementer works in this worktree, so `git log --oneline origin/main..HEAD` must list its commits. If its report names another branch (an agent with `isolation: worktree` commits in a temporary worktree), integrate before anything else: `git merge --ff-only <that branch>` here, then `git worktree remove <its path>` and `git branch -d <that branch>`; a non-fast-forward means the ticket branch moved meanwhile → STOP.
 Gate (checked by the `ship-gates` hook on SubagentStop and mirrored in `state.implement_result`): `Status: done`, `Tests: … failed 0`, `Lint: clean`. Read `node ~/.claude/tools/ship-state.mjs get <T>` → `implement_result.ok`.
 - `ok: true` ⇒ next.
 - `Status: partial|blocked` ⇒ STOP with the implementer's `Notes`/`Blocked on` verbatim (this is not a retry case: something is missing).
@@ -97,8 +100,8 @@ On "open": `git push -u origin <branch>` then `glab mr create --title "<title>" 
 Gate: exit 0 and an MR URL. Save: `ship-state set <T> mr.iid=<iid> mr.url="<url>"` · `ship-state stage <T> pipeline`. Errors ⇒ STOP with glab's message.
 
 ## 9. pipeline
-Launch: `lookup: <T> pipeline. Wait for the pipeline of MR !<iid> (glab ci status / glab mr view --output json): poll every 2–3 minutes for at most 30 minutes. Return: Finding = status (success|failed|canceled|timeout) + failing job names; Evidence = the first 5 error lines of each failed job.`
-Gate: `success`. Save `ship-state set <T> pipeline.status=<status>`.
+No subagent and no hand-rolled `glab api` calls: run `bash ~/.claude/tools/ci-wait.sh <iid>` (polls the MR's head pipeline for up to 30 min, exit 0 success · 1 failed · 2 timeout · 3 api error; prints `Finding:`, `Failed jobs:`, `Evidence (<job>):`). One Bash call with `timeout: 1900000`. Use its output verbatim as the evidence below.
+Gate: exit 0. Save `ship-state set <T> pipeline.status=<status>`.
 - `failed` ⇒ `ship-state attempt <T> pipeline` (exit 2 ⇒ STOP) then launch `root cause: <T> pipeline failure: <evidence>` (investigator), then `ship-state stage <T> implement` and relaunch **implement** with the cause and the fix to make; after it passes review-code (stage 6 runs again, its attempts counter continues), push (the MR exists, the hook allows it) and return to 9.
 - `timeout|canceled` ⇒ STOP.
 `ship-state stage <T> review-mr`.
@@ -109,8 +112,8 @@ Gate: `success`. Save `ship-state set <T> pipeline.status=<status>`.
 
 ## 11. close + learn
 1. Jira: propose the comment text (MR link, one-line summary, what to test) and **ask the user before posting**; on yes: `acli jira workitem comment create --key <T> --body "<text>"` (or the equivalent your acli version supports). No status transitions unless asked.
-2. Learn: look at `ship-state get <T>` history (attempts, verdicts, hook bounces, pipeline failures). Write **at most 3** lessons, each one line, each to its place:
-   - repo lesson (a gotcha future work here needs) → append under `## Gotchas` in `docs/codebase-map.md` if the file exists, in a separate commit on this branch (it ships with the MR); if the map does not exist, put it in the user file below;
+2. Learn: look at `ship-state get <T>` history (attempts, verdicts, hook bounces, pipeline failures) and `logs/ship-gates.jsonl`. Lessons come from those records and from command output only — never from your own narrative of the session. Write **at most 3** lessons, each one line, each to its place:
+   - repo lesson (a gotcha future work here needs) → append `- <date> <T>: <lesson>` under `## Gotchas` in `docs/codebase-map.md` if the file exists (separate commit on this branch, it ships with the MR), else in `~/.claude/knowledge/repos/<repo>.md` (kept across `/map --refresh`);
    - personal / cross-repo lesson → append `- <date> <T> <repo>: <lesson>` to `~/.claude/knowledge/lessons.md`;
    - process lesson (router chose badly, a gate misfired, a prompt was unclear) → append to `~/.claude/knowledge/process.md` for `/retro`.
    Save them: `ship-state set <T> 'lessons=<JSON array>'`. No lesson is also fine: say so.
@@ -119,4 +122,5 @@ Gate: `success`. Save `ship-state set <T> pipeline.status=<status>`.
 ## Anything else
 - `--status`: `ship-state status <T> --json` → 5 lines: stage, attempts, verdicts, MR, cost; plus `stopped.reason` if any.
 - If the user says "stop", "pause" or asks something unrelated mid-loop: answer, leave the state as is; `/ship <T>` resumes.
+- Work done outside the loop while stopped (a review run by hand that returned APPROVE, a fix committed on the branch) counts, but only once it is in the state: `ship-state verdict <T> code APPROVE`, `ship-state stage <T> <stage>`. The gates read `state.json`, not the conversation — record first, then push/open.
 - If `state.json` is missing but a branch/worktree exists (work started outside /ship): `init`, then run stage 1 and jump to the first stage whose artefact is missing (no acceptance ⇒ understand; no plan and no spec ⇒ plan; commits already there ⇒ review-code). Say what you inferred.

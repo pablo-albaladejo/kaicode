@@ -34,7 +34,7 @@ const SUBAGENT_LOG = path.join(CFG_DIR, "logs", "subagents.jsonl");
 const SHUNT_LOG = path.join(CFG_DIR, "logs", "read-shunt.jsonl"), CODEWRITE_LOG = path.join(CFG_DIR, "logs", "code-write.jsonl");
 const readLogRows = (f, kind) => { try { return fs.readFileSync(f, "utf8").split("\n").filter(Boolean).map((l) => { try { return { kind, ...JSON.parse(l) }; } catch { return null; } }).filter(Boolean); } catch { return []; } };
 // cheap-model helpers (bulk-read reads, code-write writes) show up as pseudo-agents in each session they served
-const SHUNT_ROWS = [...readLogRows(SHUNT_LOG, "bulk-read").filter((r) => r.kind === "bulk-read"), ...readLogRows(CODEWRITE_LOG, "code-write")];
+const SHUNT_ROWS = [...readLogRows(SHUNT_LOG, "bulk-read").filter((r) => r.kind === "bulk-read" || r.kind === "map"), ...readLogRows(CODEWRITE_LOG, "code-write")];
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // ── Pricing ───────────────────────────────────────────────────────────
@@ -205,11 +205,11 @@ function analyzeSession(file) {
   // bulk-read calls (tools/bulk-read.mjs, logged in logs/read-shunt.jsonl) made from this session's folder while it ran
   { const mt = main.calls.map((c) => new Date(c.t).getTime()).filter(Boolean);
     if (mt.length) { const t0 = Math.min(...mt) - 60000, t1 = Math.max(...mt) + 600000;
-      for (const kind of ["bulk-read", "code-write"]) {
+      for (const kind of ["bulk-read", "map", "code-write"]) {
         const rows = SHUNT_ROWS.filter((r) => r.kind === kind && !r.error && (!r.cwd || !main.cwd || r.cwd === main.cwd || r.cwd.startsWith(main.cwd)) && new Date(r.ts).getTime() >= t0 && new Date(r.ts).getTime() <= t1);
-        if (rows.length) subs.push({ file: kind === "bulk-read" ? SHUNT_LOG : CODEWRITE_LOG, agent: kind, id: kind, tools: [], skills: [], agentLaunches: [], compactions: [], branch: null, cwd: main.cwd, costState: null, entries: rows.length,
+        if (rows.length) subs.push({ file: kind === "code-write" ? CODEWRITE_LOG : SHUNT_LOG, agent: kind, id: kind, tools: [], skills: [], agentLaunches: [], compactions: [], branch: null, cwd: main.cwd, costState: null, entries: rows.length,
           calls: rows.map((r, i) => ({ id: `${kind}-${i}`, t: r.ts, model: r.model, agent: kind, trigger: `${kind} ${trunc(r.question || r.out, 50)}`, input: r.input || 0, cacheWrite: 0, cacheRead: r.cache_read || 0, output: r.output || 0, thinkingChars: 0, toolsCalled: [] })) }); } } }
-  for (const c of subs.flatMap((a) => (a.agent === "bulk-read" || a.agent === "code-write" ? a.calls : []))) { c.ctx = c.input + c.cacheRead; c.cost = costOf(c, c.model); c.units = costOf(c, "__units__"); }
+  for (const c of subs.flatMap((a) => (a.agent === "bulk-read" || a.agent === "map" || a.agent === "code-write" ? a.calls : []))) { c.ctx = c.input + c.cacheRead; c.cost = costOf(c, c.model); c.units = costOf(c, "__units__"); }
   const all = [main, ...subs];
   const calls = all.flatMap((a) => a.calls).sort((a, b) => new Date(a.t) - new Date(b.t));
   const tools = all.flatMap((a) => a.tools);

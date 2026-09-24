@@ -7,6 +7,8 @@
 //    so the implementer fixes or downgrades to partial; the result is written to state.implement_result for the lead.
 //  PreToolUse Bash: `glab mr create` needs verdicts.code = APPROVE (the code review gate) · `git push` needs the same,
 //    or an MR already open (fix rounds after the MR). Anything else passes.
+//  PostToolUse Bash: a successful `glab mr create` writes state.mr {iid,url,draft} and moves the stage to pipeline, so
+//    the MR is in the state even when the lead forgets to record it.
 // Fail-open on internal errors. Log: logs/ship-gates.jsonl
 import fs from "node:fs";
 import path from "node:path";
@@ -61,9 +63,22 @@ if (d.hook_event_name === "PreToolUse" && d.tool_name === "Bash") {
   if (!isCreate && !isPush) process.exit(0);
   const approved = st.s.verdicts?.code?.verdict === "APPROVE";
   const mrOpen = !!st.s.mr?.iid;
-  if (isCreate && !approved) { log({ gate: "open-mr", ticket: st.s.ticket, action: "deny", cmd: cmd.slice(0, 120) }); out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: no code-review APPROVE recorded for ${st.s.ticket} (verdicts.code = ${JSON.stringify(st.s.verdicts?.code || null)}). Run the review-code stage first; do not work around this.` } }); }
-  if (isPush && !approved && !mrOpen) { log({ gate: "push", ticket: st.s.ticket, action: "deny", cmd: cmd.slice(0, 120) }); out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: pushing ${st.s.ticket} needs a code-review APPROVE (or an MR already open). Current stage: ${st.s.stage}.` } }); }
+  if (isCreate && !approved) { log({ gate: "open-mr", ticket: st.s.ticket, action: "deny", cmd: cmd.slice(0, 120) }); out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: no code-review APPROVE recorded for ${st.s.ticket} (verdicts.code = ${JSON.stringify(st.s.verdicts?.code || null)}). Run the review-code stage first. If a reviewer already returned APPROVE on the current commits in this session, record it: node ~/.claude/tools/ship-state.mjs verdict ${st.s.ticket} code APPROVE` } }); }
+  if (isPush && !approved && !mrOpen) { log({ gate: "push", ticket: st.s.ticket, action: "deny", cmd: cmd.slice(0, 120) }); out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: pushing ${st.s.ticket} needs a code-review APPROVE (or an MR already open). Current stage: ${st.s.stage}. If a reviewer already returned APPROVE on the current commits in this session, record it: node ~/.claude/tools/ship-state.mjs verdict ${st.s.ticket} code APPROVE — otherwise run the review-code stage.` } }); }
   log({ gate: isCreate ? "open-mr" : "push", ticket: st.s.ticket, action: "allow" });
+  process.exit(0);
+}
+
+// PostToolUse Bash: facts the lead tends to forget to record. `glab mr create` succeeded ⇒ state.mr + stage pipeline.
+if (d.hook_event_name === "PostToolUse" && d.tool_name === "Bash") {
+  const cmd = String(d.tool_input?.command || ""); if (!/\bglab\s+mr\s+create\b/.test(cmd)) process.exit(0);
+  const resp = d.tool_response; const text = typeof resp === "string" ? resp : [resp?.stdout, resp?.stderr, resp?.output].filter(Boolean).join("\n");
+  const m = text.match(/https?:\/\/[^\s"]+\/merge_requests\/(\d+)/); if (!m) process.exit(0);
+  if (st.s.mr?.iid === Number(m[1])) process.exit(0);
+  st.s.mr = { iid: Number(m[1]), url: m[0], draft: /--draft\b/.test(cmd) };
+  const idx = ["prepare", "understand", "plan", "review-plan", "gate-human", "implement", "review-code", "stop-mr", "open-mr", "pipeline"];
+  if (idx.includes(st.s.stage)) { hist(`stage ${st.s.stage} → pipeline`, "recorded by hook: glab mr create succeeded"); st.s.stage = "pipeline"; st.s.stopped = null; }
+  hist(`mr !${m[1]} recorded`, m[0]); save(); log({ gate: "open-mr", ticket: st.s.ticket, action: "recorded", mr: m[1] });
   process.exit(0);
 }
 process.exit(0);

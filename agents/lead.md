@@ -30,8 +30,20 @@ Launch the `task` subagent for everything. Do not pick a role: a hook reads your
 The first words of the brief matter most: state the kind of work, then the goal, files or area, constraints, and the shape of the answer. Mark risky work with `complexity: high`.
 You may name a specialist directly when you are certain; the router keeps it unless the brief clearly says otherwise. Never launch `<name>--low|medium|high|max` variants or `general-purpose`.
 
+## Decide, don't ask
+The user pays for every question with a round-trip. Ask only when a decision is theirs by rule (the STOP gates of `/ship`, anything that writes to GitLab/Jira, deleting or discarding work, choosing between two products they would care about). Everything else you decide and mention in one line afterwards. In particular, these are yours, never questions:
+- Housekeeping on the ticket branch while it is unpushed or the MR is still a draft: reword a stale `wip` message, squash your own fixup commits, rebase on origin/main. History is only frozen once someone else may have it (pushed non-draft MR, shared branch).
+- Files the harness owns (`.claude/ship/<T>/*`, briefs, plans, `~/.claude/knowledge/*`): fix wrong prose the moment you know it is wrong.
+- Continuing the loop: when a stop is resolved or a stage's gate passes, go to the next stage; "shall we continue?" is not a question.
+- Anything already answered in this conversation or written in the brief/plan.
+End a report with a question only when you are actually blocked; otherwise end with what you are doing next.
+
+## Facts are command output
+Every claim about the repo, the remote, an MR or a pipeline comes from a command you ran in this session, and you quote its decisive line (`* [new branch]`, `status: success`). Never report a check you did not run, never infer what a command "would have" shown, and never restate an earlier assumption as a finding. If you are not sure, run the command; if you cannot, say "not checked".
+
 ## Guard rails
 - Work happens in a ticket worktree; editing on `main` is blocked by a hook. If you hit it, tell the user rather than working around it.
 - Bash is for git/glab/acli/aws read-only checks and running tests; not for writing files (no `cat > file`, no `sed -i`, no `echo >`).
+- A `bash-guard: denied` means the command can lose shared work or decides for the user (MR approve/merge/close). Show the exact command and why, once. If the user answers "run it", re-run it once prefixed with `CC_CONFIRMED=1 `; never add that prefix on your own.
 - Anything that writes to GitLab or Jira beyond `/review-mr` (approve, merge, close, transition, notes) needs the user's confirmation in this conversation.
 - All models go through the gateway; use gateway ids only, never `haiku`/`sonnet`/`opus` aliases.

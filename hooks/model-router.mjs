@@ -104,7 +104,7 @@ const DEFAULT_CONFIG = {
   jevModel: "jev-1.13.0",
   jevKeyEnv: "JEV_LLMGATEWAY_KEY",
   jevPromptChars: 800,
-  jevTimeoutMs: 4000,
+  jevTimeoutMs: 2500, // must stay well under the hook timeout in settings.json (apply-watch sets Agent → 20s)
   jevMinConfidence: 0.6,           // for use_case
   jevHighThreshold: 0.65,          // P(high) needed to accept "high" (clear cases score 1.00; a doubtful plan scored 0.60)
   jevCriteria: {                   // complexity criteria sent to Jev (the "tuned" variant of jev-tune.mjs: 12/15)

@@ -3,6 +3,8 @@
 // glab mr view …) pass without any call. Commands with risky tokens (rm, push, reset, mv, chmod, aws/kubectl/terraform
 // writes, glab writes, redirections, sudo, curl -X …) are classified by Jev as read | write | destructive:
 // destructive → deny (the agent gets the reason and must ask the user); write → allow; read → allow.
+// Destructive is deliberately narrow: unrecoverable loss of shared work, or a decision taken for the user (MR approve/
+// merge/close). After the user says "run it", the agent re-runs the command prefixed with `CC_CONFIRMED=1 ` (logged).
 // Only in plain `claude` sessions (aircode sessions skipped). Never blocks on its own errors (fail-open → allow).
 // Config in router.json: bashGuardMode "on"|"off" (default on), bashGuardMinConfidence (0.6).
 // Log: logs/bash-guard.jsonl · Report: node ~/.claude/hooks/bash-guard.mjs --report [days]
@@ -43,6 +45,7 @@ if (/code-write\.mjs/.test(cmd) && !/--report/.test(cmd)) {
     process.exit(0);
   }
 }
+if (/^\s*CC_CONFIRMED=1\s/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "confirmed", agent: input.agent_type || "main" }); process.exit(0); } // user said "run it"
 if (!RISKY.test(cmd)) process.exit(0);
 const key = process.env[cfg.jevKeyEnv]; if (!key) { log({ command: cmd.slice(0, 300), error: "no key", verdict: "allow" }); process.exit(0); }
 
@@ -50,10 +53,10 @@ const body = {
   model: cfg.jevModel,
   state: { command: cmd.slice(0, 1500), cwd: input.cwd ? path.basename(input.cwd) : "", agent: input.agent_type || "main" },
   questions: { effect: { type: "choice",
-    instructions: "A coding agent wants to run this shell command inside a git worktree of a company repository. Classify its worst plausible effect. 'destructive' means it can lose work or affect shared state: deleting files outside build artifacts, rewriting or deleting git history or branches, force pushes, pushing to main, changing cloud or CI resources, approving/merging/closing merge requests, deleting data. Plain reads, builds, tests, and edits confined to the working tree are not destructive.",
+    instructions: "A coding agent wants to run this shell command inside a git worktree of a company repository. Classify its worst plausible effect. Only two things are 'destructive': (1) losing work that cannot be recovered from the reflog or a remote — force-pushing or rewriting history of a branch that is already on the remote, deleting remote branches, pushing to main, rm -rf outside the worktree or on the home directory, deleting production data or infrastructure; (2) acting on the user's behalf on a merge request or ticket in a way others see as a decision — approving, merging, or closing an MR, transitioning a ticket. Everything else is 'write' or 'read': deleting or editing the agent's own MR notes, labels, local branches, files inside the worktree, installs, cache cleanup, cloud reads.",
     criteria: { read: "Reads state only: status, logs, listings, diffs, builds, tests, dry runs",
-                write: "Changes the working tree or local state in a recoverable way: commits, local branch work, installs, file moves inside the repo, cache cleanup",
-                destructive: "Can lose work or change shared/remote state: rm -rf on source or home, git push --force / to main, history rewrite, branch deletion, cloud/CI/infra mutations, MR approve/merge/close, data deletion" } } },
+                write: "Recoverable change: commits, local branch work, pushes to a feature branch, MR notes or labels (create, edit, delete), installs, moves or deletes inside the worktree, cache cleanup",
+                destructive: "Unrecoverable loss of shared work (force push / history rewrite of a remote branch, remote branch deletion, push to main, rm -rf outside the worktree, deleting production data or infra) or a decision taken for the user (MR approve / merge / close, ticket transition)" } } },
 };
 const t0 = Date.now();
 try {
@@ -66,7 +69,7 @@ try {
   log({ command: cmd.slice(0, 300), verdict, confidence: conf, probabilities: a?.probabilities, ms: Date.now() - t0, agent: input.agent_type || "main" });
   if (verdict === "destructive" && conf >= cfg.bashGuardMinConfidence) {
     process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny",
-      permissionDecisionReason: `bash-guard: this command was classified as destructive (${conf.toFixed(2)}): it can lose work or change shared state. Do not retry variants of it. Tell the user what you wanted to run and why, and let them run it or confirm explicitly.` } }));
+      permissionDecisionReason: `bash-guard: denied (${conf.toFixed(2)}) — this can lose shared work or takes a decision for the user (MR approve/merge/close). Show the user the exact command and why; they run it themselves, or say "run it" and you re-run it once prefixed with CC_CONFIRMED=1 (never without their words).` } }));
   }
 } catch (e) { log({ command: cmd.slice(0, 300), error: e.name === "AbortError" ? `timeout ${cfg.jevTimeoutMs}ms` : String(e.message || e), verdict: "allow" }); }
 process.exit(0);

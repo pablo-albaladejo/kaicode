@@ -38,7 +38,11 @@ if (flag === "--resolve") {
     if (!m) { console.error(`group "${name}" has ${g.models.length} models`); process.exit(1); }
     console.log(m); process.exit(0);
   }
-  console.log(models.aliases?.[arg] || arg); process.exit(0);
+  if (models.aliases?.[arg]) { console.log(models.aliases[arg]); process.exit(0); }
+  // a real model id (in the price list or any group) passes through; anything else is a typo, not a model
+  const known = new Set([...Object.keys(prices), ...Object.values(models.groups || {}).flatMap((g) => g.models)]);
+  if (known.has(arg) || known.has(arg.split("/").pop())) { console.log(arg); process.exit(0); }
+  console.error(`✗ unknown @${arg}. Known: @ticket @watch @pick @solo, a group (${Object.keys(models.groups || {}).join(", ")}), an alias (${Object.keys(models.aliases || {}).join(", ")}) or a gateway model id (cc-models --list)`); process.exit(1);
 }
 
 const dim = (s) => `\x1b[2m${s}\x1b[0m`, bold = (s) => `\x1b[1m${s}\x1b[0m`;
