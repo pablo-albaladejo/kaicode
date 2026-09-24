@@ -55,7 +55,7 @@ switch (cmd) {
   case "init": {
     const t = rest[0] || die("usage: ship-state init <TICKET> [--slug s]"); const slug = flag("--slug");
     if (fs.existsSync(file(t))) { const s = load(t); console.log(`exists: ${t} at stage ${s.stage} (attempts ${JSON.stringify(s.attempts)})`); break; }
-    const s = { ticket: t, slug: slug || null, created: now(), updated: now(), stage: "prepare", repo: path.basename(root), worktree: root, branch: git("rev-parse --abbrev-ref HEAD"),
+    const s = { ticket: t, slug: slug || null, created: now(), updated: now(), stage: "prepare", repo: (git("remote get-url origin").match(/[:/]([^/]+?)(?:\.git)?$/) || [])[1] || path.basename(root), worktree: root, branch: git("rev-parse --abbrev-ref HEAD"),
       budget_usd: BUDGET, max_attempts: MAX, cost_usd: 0, attempts: { "review-plan": 0, "review-code": 0, pipeline: 0, understand: 0 },
       acceptance: [], plan: null, spec: null, verdicts: { plan: null, code: null, mr: null }, mr: null, pipeline: null, lessons: [], stopped: null, history: [] };
     hist(s, "init"); save(s); excludeFromGit(); console.log(`initialised ${t} in ${path.relative(root, file(t))}`); break;
@@ -105,7 +105,7 @@ switch (cmd) {
   case "status": {
     const json = rest.includes("--json"); const t = resolveTicket(rest.find((x) => !x.startsWith("--")));
     if (!fs.existsSync(file(t))) { if (json) console.log("null"); process.exit(0); }
-    const s = load(t); const v = (k) => (s.verdicts[k]?.verdict === "APPROVE" ? "✓" : s.verdicts[k] ? "✗" : "-");
+    const s = load(t); const v = (k) => (/^APPROVE/.test(s.verdicts[k]?.verdict || "") ? "✓" : s.verdicts[k] ? "✗" : "-");
     const stageAttempt = { "review-plan": s.attempts["review-plan"], implement: s.attempts["review-code"], "review-code": s.attempts["review-code"], pipeline: s.attempts.pipeline }[s.stage];
     const line = `ship:${s.ticket} ${s.stage}${stageAttempt ? "#" + (stageAttempt + 1) : ""} $${s.cost_usd.toFixed(2)}/${s.budget_usd} plan${v("plan")} code${v("code")} mr:${s.mr?.iid ? "!" + s.mr.iid : "-"}${s.pipeline?.status ? " ci:" + s.pipeline.status : ""}${s.stopped ? " STOP" : ""}`;
     if (json) console.log(JSON.stringify({ ...s, line })); else console.log(line); break;

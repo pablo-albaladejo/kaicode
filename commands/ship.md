@@ -111,7 +111,15 @@ Gate: exit 0. Save `ship-state set <T> pipeline.status=<status>`.
 `ship-state stage <T> close`.
 
 ## 11. close + learn
-1. Jira: propose the comment text (MR link, one-line summary, what to test) and **ask the user before posting**; on yes: `acli jira workitem comment create --key <T> --body "<text>"` (or the equivalent your acli version supports). No status transitions unless asked.
+1. Jira: propose the comment text and **ask the user before posting**; on yes: `acli jira workitem comment create --key <T> --body "<text>"` (or the equivalent your acli version supports). No status transitions unless asked. Shape of the comment — Jira keeps line breaks literally, so **never hard-wrap lines** (one paragraph = one line, blank line between paragraphs), keep it short, and use this skeleton:
+   ```
+   MR !<iid> (<draft|ready>): <url>
+
+   What: <one line>.
+   Measured: <what was measured, where, when — or "not measured">.
+   To test: `<one command>` (<n> assertions, <what it needs>).
+   Hold: <only if something must not happen on merge — one line>.
+   ```
 2. Learn: look at `ship-state get <T>` history (attempts, verdicts, hook bounces, pipeline failures) and `logs/ship-gates.jsonl`. Lessons come from those records and from command output only — never from your own narrative of the session. Write **at most 3** lessons, each one line, each to its place:
    - repo lesson (a gotcha future work here needs) → append `- <date> <T>: <lesson>` under `## Gotchas` in `docs/codebase-map.md` if the file exists (separate commit on this branch, it ships with the MR), else in `~/.claude/knowledge/repos/<repo>.md` (kept across `/map --refresh`);
    - personal / cross-repo lesson → append `- <date> <T> <repo>: <lesson>` to `~/.claude/knowledge/lessons.md`;
