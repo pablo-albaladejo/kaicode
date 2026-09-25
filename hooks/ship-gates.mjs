@@ -84,7 +84,11 @@ if (d.hook_event_name === "PreToolUse" && d.tool_name === "Bash") {
   // Sync gate: a branch behind origin/main is never pushed or turned into an MR — rebase first. Uses the local
   // origin/main ref; if it has not been fetched in the last 15 minutes the answer could be stale, so ask for a fetch.
   const main = (git("symbolic-ref -q --short refs/remotes/origin/HEAD", cwd) || "origin/main").replace(/^origin\//, "");
-  let fetchedAgo = Infinity; try { fetchedAgo = (Date.now() - fs.statSync(path.join(root, ".git", "FETCH_HEAD")).mtimeMs) / 60000; } catch { try { fetchedAgo = (Date.now() - fs.statSync(path.join(git("rev-parse --git-common-dir", cwd), "FETCH_HEAD")).mtimeMs) / 60000; } catch {} }
+  // FETCH_HEAD lives in the worktree-private git dir (.git/worktrees/<name>/) when fetching from a worktree and in the
+  // common .git/ when fetching from the main checkout — look at both and take the freshest; missing = never fetched.
+  let fetchedAgo = Infinity;
+  for (const q of ["rev-parse --git-dir", "rev-parse --git-common-dir"]) { const dir = git(q, cwd); if (!dir) continue;
+    try { const ago = (Date.now() - fs.statSync(path.join(path.resolve(cwd, dir), "FETCH_HEAD")).mtimeMs) / 60000; if (ago < fetchedAgo) fetchedAgo = ago; } catch {} }
   const behind = Number(git(`rev-list --count HEAD..origin/${main}`, cwd) || 0);
   if (!/--force/.test(cmd) && (behind > 0 || fetchedAgo > 15)) { log({ gate: "sync", ticket: st.s.ticket, action: "deny", behind, fetchedAgo: Math.round(fetchedAgo), cmd: cmd.slice(0, 120) });
     out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: behind > 0
