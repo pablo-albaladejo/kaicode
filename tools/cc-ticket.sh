@@ -52,7 +52,7 @@ BR_WT="$(git worktree list --porcelain | awk -v b="refs/heads/$BRANCH" '/^worktr
 if [ -d "$WT" ]; then
   echo "▸ reusing worktree $WT ($(git -C "$WT" rev-parse --abbrev-ref HEAD))" >&2
 elif [ -n "$BR_WT" ] && [ "$BR_WT" != "$ROOT" ]; then
-  WT="$BR_WT"; echo "▸ $BRANCH is already checked out at $WT: using it" >&2
+  WT="$BR_WT"; echo "▸ $BRANCH is already checked out at $WT: using it" >&2; bash "$(dirname "$0")/cc-link.sh" "$WT"
 elif [ -n "$BR_WT" ]; then
   # checked out in the main working tree: move it to its own worktree, leave the main tree on main
   if [ -n "$(git status --porcelain)" ]; then
@@ -68,6 +68,7 @@ else
   elif git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then git worktree add --track -b "$BRANCH" "$WT" "origin/$BRANCH" >&2
   else git worktree add -b "$BRANCH" "$WT" "origin/$MAIN" >&2; fi
   copy_worktreeinclude "$ROOT" "$WT"
+  bash "$(dirname "$0")/cc-link.sh" "$WT"     # untracked shared folders (openspec/) as symlinks
   echo "▸ created worktree $WT on $BRANCH from origin/$MAIN" >&2
 fi
 echo "$WT"

@@ -24,7 +24,7 @@ import { execSync } from "node:child_process";
 const CFG_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
 let cfg = {}; try { cfg = JSON.parse(fs.readFileSync(path.join(CFG_DIR, "router.json"), "utf8")); } catch {}
 const BUDGET = Number(cfg.shipBudgetUsd ?? 5), MAX = Number(cfg.shipMaxAttempts ?? 2);
-const STAGES = ["prepare", "understand", "plan", "review-plan", "gate-human", "implement", "review-code", "stop-mr", "open-mr", "pipeline", "review-mr", "close", "ready-for-merge"];
+const STAGES = ["prepare", "understand", "gate-facts", "plan", "review-plan", "gate-human", "implement", "review-code", "stop-mr", "open-mr", "pipeline", "review-mr", "feedback", "close", "ready-for-merge"];
 const git = (a, cwd) => { try { return execSync(`git ${a}`, { cwd, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; } };
 const die = (m, code = 1) => { console.error("ship-state: " + m); process.exit(code); };
 const now = () => new Date().toISOString();

@@ -45,7 +45,8 @@ if command -v glab >/dev/null 2>&1; then
 fi
 
 # openspec change, ship state, jira
-SPEC=$(ls -d openspec/changes/*"$T"* openspec/changes/*"$(echo "$T" | tr 'A-Z' 'a-z')"* 2>/dev/null | head -1 || true)
+OSROOT="."; [ -d openspec ] || { MR="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" && pwd)"; [ -d "$MR/openspec" ] && OSROOT="$MR"; }   # untracked openspec/ lives in the main tree
+SPEC=$(ls -d "$OSROOT"/openspec/changes/*"$T"* "$OSROOT"/openspec/changes/*"$(echo "$T" | tr 'A-Z' 'a-z')"* 2>/dev/null | head -1 | sed "s#^\./##" || true)
 STATE=""; for w in "$ROOT" $(node -e 'for(const w of JSON.parse(process.argv[1]))console.log(w.path)' "$WTS"); do [ -f "$w/.claude/ship/$T/state.json" ] && STATE="$w/.claude/ship/$T/state.json" && break; done
 STATE_STAGE=""; [ -n "$STATE" ] && STATE_STAGE=$(node -e 'const s=require(process.argv[1]);console.log(s.stage+(s.stopped?" STOP: "+s.stopped.reason:""))' "$STATE")
 JIRA=""; command -v acli >/dev/null 2>&1 && JIRA=$(acli jira workitem view "$T" --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);const f=j.fields||j;console.log([f.status?.name||f.status,f.assignee?.displayName||f.assignee?.name||"",f.summary||""].join(" · "))}catch{}})' 2>/dev/null || true)

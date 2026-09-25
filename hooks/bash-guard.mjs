@@ -46,6 +46,11 @@ if (/code-write\.mjs/.test(cmd) && !/--report/.test(cmd)) {
   }
 }
 if (/^\s*CC_CONFIRMED=1\s/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "confirmed", agent: input.agent_type || "main" }); process.exit(0); } // user said "run it"
+// --force-with-lease on a feature branch is how a rebased branch is pushed: a write, not a loss (the lease refuses to
+// overwrite what someone else pushed). Only main/master and a bare --force stay with the classifier.
+if (/\bgit\s+push\b[^|;&]*--force-with-lease/.test(cmd) && !/\bgit\s+push\b[^|;&]*(\s--force(\s|$)|\s-f(\s|$))/.test(cmd) && !/\b(main|master)\b/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "write", confidence: 1, reason: "force-with-lease on a feature branch", agent: input.agent_type || "main" }); process.exit(0); }
+// Starting work on a ticket moves it to In Progress: the one Jira transition the loop does on its own (ship.md stage 1).
+if (/\bacli\s+jira\s+workitem\s+transition\b[^|;&]*--status\s+["']?In Progress["']?/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "write", confidence: 1, reason: "ticket → In Progress at /ship start", agent: input.agent_type || "main" }); process.exit(0); }
 if (!RISKY.test(cmd)) process.exit(0);
 const key = process.env[cfg.jevKeyEnv]; if (!key) { log({ command: cmd.slice(0, 300), error: "no key", verdict: "allow" }); process.exit(0); }
 
@@ -53,7 +58,7 @@ const body = {
   model: cfg.jevModel,
   state: { command: cmd.slice(0, 1500), cwd: input.cwd ? path.basename(input.cwd) : "", agent: input.agent_type || "main" },
   questions: { effect: { type: "choice",
-    instructions: "A coding agent wants to run this shell command inside a git worktree of a company repository. Classify its worst plausible effect. Only two things are 'destructive': (1) losing work that cannot be recovered from the reflog or a remote — force-pushing or rewriting history of a branch that is already on the remote, deleting remote branches, pushing to main, rm -rf outside the worktree or on the home directory, deleting production data or infrastructure; (2) acting on the user's behalf on a merge request or ticket in a way others see as a decision — approving, merging, or closing an MR, transitioning a ticket. Everything else is 'write' or 'read': deleting or editing the agent's own MR notes, labels, local branches, files inside the worktree, installs, cache cleanup, cloud reads.",
+    instructions: "A coding agent wants to run this shell command inside a git worktree of a company repository. Classify its worst plausible effect. Only two things are 'destructive': (1) losing work that cannot be recovered from the reflog or a remote — a bare --force push, rewriting history of main or of another person's branch, deleting remote branches, pushing to main (note: git push --force-with-lease on the author's own feature branch after a rebase is a normal 'write'), rm -rf outside the worktree or on the home directory, deleting production data or infrastructure; (2) acting on the user's behalf on a merge request or ticket in a way others see as a decision — approving, merging, or closing an MR, transitioning a ticket. Everything else is 'write' or 'read': deleting or editing the agent's own MR notes, labels, local branches, files inside the worktree, installs, cache cleanup, cloud reads.",
     criteria: { read: "Reads state only: status, logs, listings, diffs, builds, tests, dry runs",
                 write: "Recoverable change: commits, local branch work, pushes to a feature branch, MR notes or labels (create, edit, delete), installs, moves or deletes inside the worktree, cache cleanup",
                 destructive: "Unrecoverable loss of shared work (force push / history rewrite of a remote branch, remote branch deletion, push to main, rm -rf outside the worktree, deleting production data or infra) or a decision taken for the user (MR approve / merge / close, ticket transition)" } } },

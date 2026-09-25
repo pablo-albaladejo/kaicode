@@ -6,9 +6,11 @@
 //    "Lint: clean". "done" with red tests/lint or a missing format is sent back ONCE (decision: block, with the reason)
 //    so the implementer fixes or downgrades to partial; the result is written to state.implement_result for the lead.
 //  PreToolUse Bash: `glab mr create` needs verdicts.code = APPROVE (the code review gate) · `git push` needs the same,
-//    or an MR already open (fix rounds after the MR). Anything else passes.
+//    or an MR already open (fix rounds after the MR) · both need the branch rebased on origin/main with a fetch less
+//    than 15 min old (the sync gate). Anything else passes.
 //  PostToolUse Bash: a successful `glab mr create` writes state.mr {iid,url,draft} and moves the stage to pipeline, so
 //    the MR is in the state even when the lead forgets to record it.
+//  PreToolUse Agent|Task: no new subagent while the ticket is over budget (state.cost_usd, kept live by the statusline).
 // Fail-open on internal errors. Log: logs/ship-gates.jsonl
 import fs from "node:fs";
 import path from "node:path";
@@ -27,7 +29,11 @@ const root = git("rev-parse --show-toplevel", cwd); if (!root) process.exit(0);
 const branchTicket = (git("rev-parse --abbrev-ref HEAD", cwd).match(/[A-Z][A-Z0-9]+-\d+/) || [])[0];
 function findState() {
   const dir = path.join(root, ".claude", "ship"); let ds = []; try { ds = fs.readdirSync(dir).filter((x) => fs.existsSync(path.join(dir, x, "state.json"))); } catch { return null; }
-  const pick = ds.includes(branchTicket) ? branchTicket : ds.length === 1 ? ds[0] : null; if (!pick) return null;
+  // The state of THIS worktree only: the ticket in the branch name, or a state whose `worktree` is this root. A stray
+  // state in the main tree (a ticket that was cleaned by hand) must never gate a session on main.
+  let pick = ds.includes(branchTicket) ? branchTicket : null;
+  if (!pick) for (const t of ds) { try { const st = JSON.parse(fs.readFileSync(path.join(dir, t, "state.json"), "utf8")); if (st.worktree === root && !/^(main|master)$/.test(git("rev-parse --abbrev-ref HEAD", cwd))) { pick = t; break; } } catch {} }
+  if (!pick) return null;
   try { return { file: path.join(dir, pick, "state.json"), s: JSON.parse(fs.readFileSync(path.join(dir, pick, "state.json"), "utf8")) }; } catch { return null; }
 }
 const st = findState(); if (!st) process.exit(0);
@@ -57,12 +63,33 @@ if (d.hook_event_name === "SubagentStop") {
   process.exit(0);
 }
 
+// Budget gate: no new subagent when the ticket is over budget (cost written by the statusline every tick, and by
+// `ship-state cost`). The lead raises it explicitly: /ship <T> --budget <usd>. A STOP already recorded lets it through
+// (the user is being asked); so does an explicit override in state.json (budget_override: true).
+if (d.hook_event_name === "PreToolUse" && /^(Agent|Task)$/.test(d.tool_name || "")) {
+  const cost = Number(st.s.cost_usd || 0), budget = Number(st.s.budget_usd || 0);
+  if (budget > 0 && cost > budget && !st.s.budget_override && !st.s.stopped) {
+    hist("budget: launch denied", `$${cost.toFixed(2)} > $${budget}`); save(); log({ gate: "budget", ticket: st.s.ticket, action: "deny", cost, budget });
+    out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: ${st.s.ticket} is over budget ($${cost.toFixed(2)} of $${budget}). STOP and ask the user; to continue they say the new budget: node ~/.claude/tools/ship-state.mjs set ${st.s.ticket} budget_usd=<usd>` } });
+  }
+  process.exit(0);
+}
+
 if (d.hook_event_name === "PreToolUse" && d.tool_name === "Bash") {
   const cmd = String(d.tool_input?.command || "");
   const isCreate = /\bglab\s+mr\s+create\b/.test(cmd), isPush = /\bgit\s+push\b/.test(cmd);
   if (!isCreate && !isPush) process.exit(0);
   const approved = st.s.verdicts?.code?.verdict === "APPROVE";
   const mrOpen = !!st.s.mr?.iid;
+  // Sync gate: a branch behind origin/main is never pushed or turned into an MR — rebase first. Uses the local
+  // origin/main ref; if it has not been fetched in the last 15 minutes the answer could be stale, so ask for a fetch.
+  const main = (git("symbolic-ref -q --short refs/remotes/origin/HEAD", cwd) || "origin/main").replace(/^origin\//, "");
+  let fetchedAgo = Infinity; try { fetchedAgo = (Date.now() - fs.statSync(path.join(root, ".git", "FETCH_HEAD")).mtimeMs) / 60000; } catch { try { fetchedAgo = (Date.now() - fs.statSync(path.join(git("rev-parse --git-common-dir", cwd), "FETCH_HEAD")).mtimeMs) / 60000; } catch {} }
+  const behind = Number(git(`rev-list --count HEAD..origin/${main}`, cwd) || 0);
+  if (!/--force/.test(cmd) && (behind > 0 || fetchedAgo > 15)) { log({ gate: "sync", ticket: st.s.ticket, action: "deny", behind, fetchedAgo: Math.round(fetchedAgo), cmd: cmd.slice(0, 120) });
+    out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: behind > 0
+      ? `ship-gate: ${st.s.ticket} is ${behind} commit(s) behind origin/${main}. Rebase first: bash ~/.claude/tools/sync-check.sh --fix (then push with --force-with-lease if the branch was already pushed).`
+      : `ship-gate: origin/${main} was last fetched ${Math.round(fetchedAgo)} min ago — run bash ~/.claude/tools/sync-check.sh (fetches and checks) and retry.` } }); }
   if (isCreate && !approved) { log({ gate: "open-mr", ticket: st.s.ticket, action: "deny", cmd: cmd.slice(0, 120) }); out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: no code-review APPROVE recorded for ${st.s.ticket} (verdicts.code = ${JSON.stringify(st.s.verdicts?.code || null)}). Run the review-code stage first. If a reviewer already returned APPROVE on the current commits in this session, record it: node ~/.claude/tools/ship-state.mjs verdict ${st.s.ticket} code APPROVE` } }); }
   if (isPush && !approved && !mrOpen) { log({ gate: "push", ticket: st.s.ticket, action: "deny", cmd: cmd.slice(0, 120) }); out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: pushing ${st.s.ticket} needs a code-review APPROVE (or an MR already open). Current stage: ${st.s.stage}. If a reviewer already returned APPROVE on the current commits in this session, record it: node ~/.claude/tools/ship-state.mjs verdict ${st.s.ticket} code APPROVE — otherwise run the review-code stage.` } }); }
   log({ gate: isCreate ? "open-mr" : "push", ticket: st.s.ticket, action: "allow" });

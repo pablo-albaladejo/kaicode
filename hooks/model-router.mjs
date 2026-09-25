@@ -47,7 +47,7 @@ const DEFAULT_CONFIG = {
   routeBuiltins: true,
   roles: {
     Explore: ["explore", "explain"],
-    investigator: ["status", "debug"],
+    investigator: ["status", "debug", "research"],
     planner: ["plan", "architecture"],
     implementer: ["implement", "bugfix", "refactor", "tests", "migration", "cicd", "docs"],
     reviewer: ["review", "review-plan", "security"],
@@ -59,6 +59,7 @@ const DEFAULT_CONFIG = {
     pro:   "fireworks/deepseek-v4-pro",     // $1.32/$3.96  coding with judgement
     sol:   "gpt-6-sol",                     // $2/$10       reasoning: plans, design, review, hard implementation
     opus:  "claude-opus-5-5",               // $4/$20       critical: security, architecture, root cause
+    web:   "gpt-6-luna",                    // $0.10/$0.50 + $0.01/search — native web search through the gateway (webSearch:true in its catalogue; also gpt-6-sol, gemini-*-flash*, claude-*; NOT the fireworks/deepseek models)
   },
   // (use case, complexity) → [model alias, effort]. Complexity signals are what Jev / the rules look at.
   useCases: {
@@ -90,6 +91,8 @@ const DEFAULT_CONFIG = {
                     levels: { low: ["pro", "medium"],  medium: ["sol", "high"],     high: ["opus", "max"] } },
     migration:    { label: "migration",              rules: ["migrat", "backfill", "dual.?write", "rollback", "schema change", "split .* table"],
                     levels: { low: ["pro", "medium"],  medium: ["sol", "high"],     high: ["opus", "max"] } },
+    research:     { label: "web research: official docs, library/API references, vendor changelogs, anything that needs a web search", rules: ["^research:", "search the web", "look ?up (online|the docs)", "official docs", "documentation (for|of) ", "latest version", "release notes of", "how does .* work in (the )?(latest|current)"],
+                    levels: { low: ["web", "low"],     medium: ["web", "low"],      high: ["web", "medium"] } },
     docs:         { label: "docs / MR description",  rules: ["mr description", "release notes", "readme", "runbook", "document(ation)?", "changelog", "onboarding"],
                     levels: { low: ["luna", "low"],    medium: ["luna", "medium"],  high: ["sol", "medium"] } },
     cicd:         { label: "CI/CD / infra config",   rules: ["\\bci\\b", "pipeline", "gitlab-ci", "terraform", "kubernetes", "k8s", "helm", "dockerfile", "deploy(ment)? config"],
@@ -115,7 +118,7 @@ const DEFAULT_CONFIG = {
 };
 
 // brief prefix → use case (lowercase, matched at the start of the prompt or description)
-const DEFAULT_PREFIXES = { "understand:": "status", "lookup:": "status", "root cause:": "debug", "plan:": "plan", "adr:": "architecture", "review plan:": "review-plan", "review design:": "review-plan", "review:": "review", "change:": "implement", "change: docs": "docs", "read-only:": "explain", "explore:": "explore" };
+const DEFAULT_PREFIXES = { "understand:": "status", "lookup:": "status", "research:": "research", "root cause:": "debug", "plan:": "plan", "adr:": "architecture", "review plan:": "review-plan", "review design:": "review-plan", "review:": "review", "change:": "implement", "change: docs": "docs", "read-only:": "explain", "explore:": "explore" };
 
 function loadConfig() {
   let user = {};

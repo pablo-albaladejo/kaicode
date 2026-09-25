@@ -31,7 +31,7 @@ const H = (t) => out.push(`\n## ${t}`);
 
 // ── tickets & stages ───────────────────────────────────────────────────
 const stages = rows("ship-stages.jsonl");
-const HUMAN = new Set(["gate-human", "stop-mr", "ready-for-merge"]);
+const HUMAN = new Set(["gate-facts", "gate-human", "stop-mr", "ready-for-merge"]);
 R.tickets = [...group(stages, (r) => r.ticket)].map(([t, xs]) => ({ ticket: t, repo: xs[0].repo, stages: xs.length, last: xs[xs.length - 1].to, agent_minutes: Math.round(xs.filter((x) => !HUMAN.has(x.stage)).reduce((a, x) => a + (x.seconds || 0), 0) / 60), attempts: xs.reduce((a, x) => a + (x.attempts || 0), 0) }));
 R.stage_medians = [...group(stages.filter((r) => !HUMAN.has(r.stage) && r.seconds != null), (r) => r.stage)].map(([s, xs]) => ({ stage: s, n: xs.length, median_s: median(xs.map((x) => x.seconds)), max_s: Math.max(...xs.map((x) => x.seconds)) }));
 H(`Tickets (${DAYS}d)`);

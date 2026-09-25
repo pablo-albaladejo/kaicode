@@ -198,8 +198,8 @@ function agentMedian(base, model) {
     for (const [key, xs] of by) AGENT_DUR.set(key, median(xs)); }
   return AGENT_DUR.get(`${base}|${model}`) ?? AGENT_DUR.get(base) ?? null;
 }
-const SHIP_STAGES = ["prepare", "understand", "plan", "review-plan", "gate-human", "implement", "review-code", "stop-mr", "open-mr", "pipeline", "review-mr", "close", "ready-for-merge"];
-const HUMAN_STAGES = new Set(["gate-human", "stop-mr", "ready-for-merge"]);
+const SHIP_STAGES = ["prepare", "understand", "gate-facts", "plan", "review-plan", "gate-human", "implement", "review-code", "stop-mr", "open-mr", "pipeline", "review-mr", "feedback", "close", "ready-for-merge"];
+const HUMAN_STAGES = new Set(["gate-facts", "gate-human", "stop-mr", "ready-for-merge"]);
 function stageMedians() { const by = new Map(); try { for (const r of tailJsonl(path.join(CFG_DIR, "logs", "ship-stages.jsonl"), 512 * 1024)) { if (r.seconds == null || HUMAN_STAGES.has(r.stage)) continue; if (!by.has(r.stage)) by.set(r.stage, []); by.get(r.stage).push(r.seconds); } } catch {} const m = new Map(); for (const [k, xs] of by) m.set(k, median(xs)); return m; }
 // remaining agent time for a /ship state: rest of the current stage + medians of the stages still to run (human stops excluded)
 function shipEta(s) {
@@ -332,21 +332,37 @@ if (wt) l2.push(paint("yel", `wt:${wt}`));
 // /ship loop state in this worktree (.claude/ship/<T>/state.json): stage, attempt, cost
 try {
   const shipDir = path.join(dir, ".claude", "ship"); const ts = fs.readdirSync(shipDir).filter((t) => fs.existsSync(path.join(shipDir, t, "state.json")));
-  const pick = ts.find((t) => (branch || "").includes(t)) || (ts.length === 1 ? ts[0] : null);
+  // only the state of this worktree: ticket in the branch name, or state.worktree == this dir (never on main/detached)
+  const onMain = !branch || /^(main|master|HEAD)$/.test(branch);
+  const pick = ts.find((t) => (branch || "").includes(t)) || (!onMain ? ts.find((t) => { try { return JSON.parse(fs.readFileSync(path.join(shipDir, t, "state.json"), "utf8")).worktree === dir; } catch { return false; } }) : null) || null;
   if (pick) { const s = JSON.parse(fs.readFileSync(path.join(shipDir, pick, "state.json"), "utf8")); const gate = { "review-plan": "review-plan", implement: "review-code", "review-code": "review-code", pipeline: "pipeline" }[s.stage];
-    const n = gate ? (s.attempts?.[gate] || 0) + 1 : 0; SHIP = { s, n, idx: l2.length }; l2.push(""); }
+    const n = gate ? (s.attempts?.[gate] || 0) + 1 : 0; SHIP = { s, n, idx: l2.length, file: path.join(shipDir, pick, "state.json") }; l2.push(""); }
 } catch {}
 // rendered after the session cost is known (below): live = max(saved ticket cost, this session's real cost)
 const renderShip = () => { if (!SHIP) return; const { s, n, idx } = SHIP; const live = Math.max(Number(s.cost_usd || 0), SESSION_REAL ?? cost ?? 0);
+  // write-through: the budget gate in ship-gates reads state.cost_usd before every launch; keep it current (≥ 1 cent steps)
+  if (live > Number(s.cost_usd || 0) + 0.01 && SHIP.file) { try { const cur = JSON.parse(fs.readFileSync(SHIP.file, "utf8")); if (live > Number(cur.cost_usd || 0)) { cur.cost_usd = Math.round(live * 10000) / 10000; cur.cost_updated = new Date().toISOString(); fs.writeFileSync(SHIP.file, JSON.stringify(cur, null, 2) + "\n"); } } catch {} }
   const eta = s.stopped || HUMAN_STAGES.has(s.stage) ? null : shipEta(s);
-  l2[idx] = paint(s.stopped ? "red" : live > Number(s.budget_usd || 0) ? "red" : "yel", `ship:${s.stage}${n > 1 ? "#" + n : ""}${s.stopped ? " STOP" : ""} $${live.toFixed(2)}/${s.budget_usd}`) + (eta ? paint("dim", ` ${eta}`) : ""); };
+  // progress track: one cell per /ship stage, filled up to the current one (human stops shown as ◆)
+  const si = SHIP_STAGES.indexOf(s.stage), track = SHIP_STAGES.map((st, i) => (i < si ? "▰" : i === si ? (HUMAN_STAGES.has(st) || s.stopped ? "◆" : "▶") : HUMAN_STAGES.has(st) ? "◇" : "▱")).join("");
+  const col = s.stopped ? "red" : live > Number(s.budget_usd || 0) ? "red" : "yel";
+  l2[idx] = paint(col, `ship `) + paint("dim", track) + paint(col, ` ${s.stage}${n > 1 ? "#" + n : ""} ${si + 1}/${SHIP_STAGES.length}${s.stopped ? " STOP" : ""} $${live.toFixed(2)}/${s.budget_usd}`) + (eta ? paint("dim", ` ${eta}`) : ""); };
 const add = d.cost?.total_lines_added ?? 0, del = d.cost?.total_lines_removed ?? 0;
 if (add || del) l2.push(paint("grn", `+${add}`) + paint("red", ` -${del}`));
 const pc = d.prompt_cache;
 if (pc?.hit_ratio != null) l2.push(paint(pc.warm ? "dim" : "yel", `cache ${Math.round(pc.hit_ratio * 100)}%${pc.warm ? "" : " cold"}`));
+// OpenSpec: the change of this ticket if there is one (spec:<slug>), else the count of open changes. The worktree may
+// not carry openspec/ (untracked in some repos): fall back to the main worktree of the repo.
 try {
-  const ch = path.join(d.workspace?.project_dir || dir, "openspec", "changes");
-  if (fs.existsSync(ch)) l2.push(paint("cyn", `openspec ${fs.readdirSync(ch, { withFileTypes: true }).filter((e) => e.isDirectory() && e.name !== "archive").length}`));
+  const roots = [d.workspace?.project_dir || dir];
+  try { const first = execSync("git worktree list --porcelain", { cwd: dir, stdio: ["ignore", "pipe", "ignore"], timeout: 500 }).toString().split("\n")[0].replace(/^worktree /, ""); if (first && !roots.includes(first)) roots.push(first); } catch {}
+  const ch = roots.map((r) => path.join(r, "openspec", "changes")).find((p) => fs.existsSync(p));
+  if (ch) {
+    const changes = fs.readdirSync(ch, { withFileTypes: true }).filter((e) => e.isDirectory() && e.name !== "archive").map((e) => e.name);
+    const ticket = (branch || "").match(/[A-Z][A-Z0-9]+-\d+/)?.[0];
+    const mine = ticket ? changes.find((c) => c.toLowerCase().includes(ticket.toLowerCase())) : null;
+    l2.push(mine ? paint("cyn", `spec:${mine}`) : paint("dim", `openspec ${changes.length}${ticket ? " (none for " + ticket + ")" : ""}`));
+  }
 } catch {}
 
 // Line 3: agents · tools · skills
