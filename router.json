@@ -1,4 +1,51 @@
 {
-  "mode": "shadow",
-  "tiers": { "cheap": "fireworks/deepseek-v4.1-flash", "strong": "fireworks/kimi-k3" }
+  "mode": "enforce",
+  "classifier": "jev",
+  "jevUrl": "https://api.llmgateway.io/v1/systemone",
+  "jevModel": "jev-1.13.0",
+  "jevKeyEnv": "JEV_LLMGATEWAY_KEY",
+  "jevTimeoutMs": 4000,
+  "jevMinConfidence": 0.6,
+  "effortMode": "variant",
+  "jevHighThreshold": 0.65,
+  "useCases": {
+    "review": {
+      "levels": {
+        "medium": [
+          "sol",
+          "medium"
+        ],
+        "high": [
+          "opus",
+          "high"
+        ]
+      }
+    },
+    "debug": {
+      "levels": {
+        "medium": [
+          "pro",
+          "high"
+        ]
+      }
+    }
+  },
+  "intentMode": "on",
+  "intentMinConfidence": 0.5,
+  "bashGuardMode": "on",
+  "bashGuardMinConfidence": 0.6,
+  "roleMode": "enforce",
+  "placeholder": "task",
+  "shuntMode": "on",
+  "shuntMinLines": 350,
+  "shuntAliases": [
+    "pro",
+    "sol",
+    "opus"
+  ],
+  "shuntModel": "fireworks/deepseek-v4.1-flash",
+  "codeWriteAgents": "^implementer--(pro|sol)-",
+  "codeWriteMaxChars": 600000,
+  "shipBudgetUsd": 5,
+  "shipMaxAttempts": 2
 }
