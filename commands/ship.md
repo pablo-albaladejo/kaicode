@@ -66,8 +66,10 @@ Open questions: if any has no reasonable default, ask the user **once** (all que
 ## 2b. gate-facts  (human, only when `Facts needed before planning` is not `none`)
 Nothing gets planned on an assumption that a command can replace. `ship-state stage <T> gate-facts`, then:
 - `who: agent` facts → **one** `lookup:` investigator with the whole list ("lookup: <T> facts before planning: 1. <fact> — <command> 2. …; return each as `<fact> = <value> (<command>)`, and say `inferred, not measured` when a command only suggests it"). Run a command yourself only when there is a single fact and it is one read-only line. Append the answers as `Facts: <fact> = <value> (<command>, <date>)` to brief.md. No implementer is launched before `plan`: nothing in the repo changes during understand or gate-facts (brief.md is written with `cat > … <<'EOF'`).
-- `who: human` facts → STOP with, per fact, the exact command to run (profile, environment, query) and what to paste back. The user runs it or answers "run it as read-only with profile X" — then the investigator runs it. Append the results to brief.md the same way.
-- `Conditional scope` present and the fact says the conditional part is **not needed** (zero rows, feature already on, nothing to migrate) → do not plan it: the ticket's remaining work is the record of the measurement (an AGENTS.md / docs note, the Jira comment). Say so, plan only that, and note it in Learn.
+- `who: human` is the last resort. Before labelling a fact human, check whether you can run it read-only yourself: `aws-vault list` (a profile with a live session counts), `glab auth status`, `acli jira auth status`, the Atlassian MCP. If a live session covers it, it is `who: agent`. Only what truly needs the user's hands or judgement → STOP with, per fact, the exact command to run (profile, environment, query) and what to paste back. The user runs it or answers "run it as read-only with profile X" — then the investigator runs it. Append the results to brief.md the same way.
+- **Persist the facts at once.** As soon as the facts are in, post them as a Jira comment (`Measured before planning (<date>):` + one line per fact with its command) — `brief.md` dies with the worktree, the ticket does not. Do not wait for close.
+- **Does the ticket still stand?** Compare the facts with the ticket's premise. If a fact says the work is **not needed** (zero rows, feature already on, nothing to migrate), **belongs elsewhere** (another repo, service, team or AWS account), or **the premise is wrong** (the bug is not where the ticket says) ⇒ `ship-state stage <T> gate-facts` stays, and STOP: "The measurement refutes the ticket: <one line>. Evidence: <facts>. Options: (a) close as Won't Do / re-assign to <owner> with this comment, (b) re-scope to <what is left here>, (c) continue as written." Never invent a smaller deliverable (a docs note, a comment in code) to keep the loop moving — a docs-only MR is plan only if the user picks it. Note it in Learn.
+- `Conditional scope` present and the fact confirms the conditional part **is** needed → plan it as written.
 Every later brief (plan, implement, review) carries the `Facts:` lines. A plan that builds the conditional part without the fact is a review-plan REQUEST CHANGES, not a judgement call.
 `ship-state stage <T> plan`.
 
@@ -82,7 +84,7 @@ Launch: `review plan: <T>. Plan: <plan.md>. acceptance: <criteria>. spec: <path 
 Gate: JSON parses and `verdict` is `APPROVE`. Record: `ship-state verdict <T> plan "<verdict>"`.
 - `APPROVE` ⇒ next.
 - Otherwise ⇒ `ship-state attempt <T> review-plan` (exit 2 ⇒ STOP with the findings) and `SendMessage` the same planner with the findings verbatim ("Reviewer findings to address: …; return the full plan again"); then review again.
-Human gate: if `plan.risk == high` or `plan.files > 15` ⇒ `ship-state stage <T> gate-human`, show the plan (Goal, Risk, Files, Steps titles) and STOP: "approve the plan, change it, or abort". On approval continue.
+Human gate: if `plan.risk == high` or `plan.files > 15`, **or the plan's Goal differs from the ticket's** (re-scoped after gate-facts, docs-only for a code ticket, work moved to another repo) ⇒ `ship-state stage <T> gate-human`, show the plan (Goal, Risk, Files, Steps titles) and STOP: "approve the plan, change it, or abort". On approval continue.
 `ship-state stage <T> implement`.
 
 ## 5. implement

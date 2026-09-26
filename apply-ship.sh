@@ -31,7 +31,7 @@ if(!JSON.stringify(d.hooks.SubagentStop).includes("ship-gates.mjs"))
   d.hooks.SubagentStop.push({hooks:[{type:"command",command:`${node} ${home}/.claude/hooks/ship-gates.mjs`,timeout:10}]});
 d.hooks.PreToolUse??=[];
 if(!JSON.stringify(d.hooks.PreToolUse).includes("ship-gates.mjs"))
-  d.hooks.PreToolUse.push({matcher:"Bash",hooks:[{type:"command",command:`${node} ${home}/.claude/hooks/ship-gates.mjs`,timeout:5}]});
+  d.hooks.PreToolUse.push({matcher:"Bash",hooks:[{type:"command",command:`${node} ${home}/.claude/hooks/ship-gates.mjs`,timeout:15}]});
 if(!JSON.stringify(d.hooks.PreToolUse).match(/"matcher":"Agent\|Task"[^\]]*ship-gates\.mjs/))
   d.hooks.PreToolUse.push({matcher:"Agent|Task",hooks:[{type:"command",command:`${node} ${home}/.claude/hooks/ship-gates.mjs`,timeout:5}]});
 d.hooks.PostToolUse??=[];

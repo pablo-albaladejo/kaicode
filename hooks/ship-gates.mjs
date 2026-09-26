@@ -82,18 +82,20 @@ if (d.hook_event_name === "PreToolUse" && d.tool_name === "Bash") {
   const approved = st.s.verdicts?.code?.verdict === "APPROVE";
   const mrOpen = !!st.s.mr?.iid;
   // Sync gate: a branch behind origin/main is never pushed or turned into an MR — rebase first. Uses the local
-  // origin/main ref; if it has not been fetched in the last 15 minutes the answer could be stale, so ask for a fetch.
+  // origin/main ref; if it has not been fetched in the last 15 minutes the hook fetches it itself.
   const main = (git("symbolic-ref -q --short refs/remotes/origin/HEAD", cwd) || "origin/main").replace(/^origin\//, "");
   // FETCH_HEAD lives in the worktree-private git dir (.git/worktrees/<name>/) when fetching from a worktree and in the
   // common .git/ when fetching from the main checkout — look at both and take the freshest; missing = never fetched.
   let fetchedAgo = Infinity;
   for (const q of ["rev-parse --git-dir", "rev-parse --git-common-dir"]) { const dir = git(q, cwd); if (!dir) continue;
     try { const ago = (Date.now() - fs.statSync(path.join(path.resolve(cwd, dir), "FETCH_HEAD")).mtimeMs) / 60000; if (ago < fetchedAgo) fetchedAgo = ago; } catch {} }
+  // A stale fetch is hygiene, not risk: fetch here (quiet, ≤ 8 s) instead of denying. Only a failed fetch still denies.
+  if (fetchedAgo > 15) { try { execSync(`git fetch --quiet origin ${main}`, { cwd, stdio: "ignore", timeout: 8000 }); fetchedAgo = 0; } catch {} }
   const behind = Number(git(`rev-list --count HEAD..origin/${main}`, cwd) || 0);
   if (!/--force/.test(cmd) && (behind > 0 || fetchedAgo > 15)) { log({ gate: "sync", ticket: st.s.ticket, action: "deny", behind, fetchedAgo: Math.round(fetchedAgo), cmd: cmd.slice(0, 120) });
     out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: behind > 0
       ? `ship-gate: ${st.s.ticket} is ${behind} commit(s) behind origin/${main}. Rebase first: bash ~/.claude/tools/sync-check.sh --fix (then push with --force-with-lease if the branch was already pushed).`
-      : `ship-gate: origin/${main} was last fetched ${Math.round(fetchedAgo)} min ago — run bash ~/.claude/tools/sync-check.sh (fetches and checks) and retry.` } }); }
+      : `ship-gate: origin/${main} could not be fetched (network/VPN?) — run bash ~/.claude/tools/sync-check.sh and retry.` } }); }
   if (isCreate && !approved) { log({ gate: "open-mr", ticket: st.s.ticket, action: "deny", cmd: cmd.slice(0, 120) }); out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: no code-review APPROVE recorded for ${st.s.ticket} (verdicts.code = ${JSON.stringify(st.s.verdicts?.code || null)}). Run the review-code stage first. If a reviewer already returned APPROVE on the current commits in this session, record it: node ~/.claude/tools/ship-state.mjs verdict ${st.s.ticket} code APPROVE` } }); }
   if (isPush && !approved && !mrOpen) { log({ gate: "push", ticket: st.s.ticket, action: "deny", cmd: cmd.slice(0, 120) }); out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: pushing ${st.s.ticket} needs a code-review APPROVE (or an MR already open). Current stage: ${st.s.stage}. If a reviewer already returned APPROVE on the current commits in this session, record it: node ~/.claude/tools/ship-state.mjs verdict ${st.s.ticket} code APPROVE — otherwise run the review-code stage.` } }); }
   log({ gate: isCreate ? "open-mr" : "push", ticket: st.s.ticket, action: "allow" });

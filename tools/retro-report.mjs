@@ -41,8 +41,11 @@ if (R.stage_medians.length) out.push("- stage medians: " + R.stage_medians.map((
 
 // ── cost per branch (cc-cost) ──────────────────────────────────────────
 let sessions = [];
+// "HEAD" is what Claude Code records in a detached HEAD or outside a repo (the worktrees container): attribute those
+// sessions to the ticket in their folder name, else to the folder, so the biggest row is not an unexplained "HEAD".
+const costKey = (s) => { if (s.branch && s.branch !== "HEAD") return s.branch; const t = String(s.cwd || s.project || "").match(/[A-Z][A-Z0-9]+-\d+/); return t ? `${t[0]} (detached/outside repo)` : `${s.project || "?"} (no branch)`; };
 try { sessions = JSON.parse(execFileSync(process.execPath, [path.join(CFG_DIR, "tools", "cc-cost.mjs"), "--days", String(DAYS), "--all", "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })); } catch {}
-R.cost = { total: sessions.reduce((a, s) => a + (s.cost || 0), 0), sessions: sessions.length, by_branch: [...group(sessions, (s) => s.branch || "(no branch)")].map(([b, xs]) => ({ branch: b, sessions: xs.length, cost: xs.reduce((a, s) => a + (s.cost || 0), 0), subagents: xs.reduce((a, s) => a + (s.subagents || 0), 0) })).sort((a, b) => b.cost - a.cost) };
+R.cost = { total: sessions.reduce((a, s) => a + (s.cost || 0), 0), sessions: sessions.length, by_branch: [...group(sessions, (s) => costKey(s))].map(([b, xs]) => ({ branch: b, sessions: xs.length, cost: xs.reduce((a, s) => a + (s.cost || 0), 0), subagents: xs.reduce((a, s) => a + (s.subagents || 0), 0) })).sort((a, b) => b.cost - a.cost) };
 H("Cost");
 out.push(`- ${usd(R.cost.total)} over ${R.cost.sessions} session(s)`);
 for (const b of R.cost.by_branch.slice(0, 8)) out.push(`- ${b.branch}: ${usd(b.cost)} · ${b.sessions} session(s) · ${b.subagents} subagents`);
@@ -68,11 +71,15 @@ for (const c of R.router.by_case.slice(0, 10)) out.push(`- ${c.case}: ${c.n} →
 // ── gates & guard ──────────────────────────────────────────────────────
 const gates = rows("ship-gates.jsonl"), guard = rows("bash-guard.jsonl");
 R.gates = [...group(gates, (r) => `${r.gate}:${r.action}`)].map(([k, xs]) => `${k}×${xs.length}`);
-R.guard = { denied: guard.filter((r) => r.verdict === "destructive").length, confirmed: guard.filter((r) => r.verdict === "confirmed").length, classified: guard.filter((r) => r.verdict && r.verdict !== "confirmed").length, denied_cmds: guard.filter((r) => r.verdict === "destructive").map((r) => (r.command || "").slice(0, 70)) };
+// "confirmed" = commands run with CC_CONFIRMED=1 (user said "run it", or the user's own request was the action) — it is
+// NOT "denials the user overrode"; a deny and its confirmed re-run are matched by command text below.
+const deniedRows = guard.filter((r) => r.verdict === "destructive"), confirmedCmds = new Set(guard.filter((r) => r.verdict === "confirmed").map((r) => (r.command || "").replace(/^\s*CC_CONFIRMED=1\s+/, "").slice(0, 200)));
+const dedup = [...group(deniedRows, (r) => (r.command || "").slice(0, 200))].map(([c, xs]) => ({ cmd: c, n: xs.length, reason: xs[0].reason || "", rerun: confirmedCmds.has(c) }));
+R.guard = { denied: deniedRows.length, distinct_denied: dedup.length, overridden: dedup.filter((d) => d.rerun).length, confirmed: confirmedCmds.size, classified: guard.filter((r) => r.verdict && r.verdict !== "confirmed").length, denied_cmds: dedup };
 H("Gates & guard");
 out.push(`- ship gates: ${R.gates.join(" · ") || "none fired"}`);
-out.push(`- bash-guard: ${R.guard.classified} classified · ${R.guard.denied} denied · ${R.guard.confirmed} confirmed by the user`);
-for (const c of R.guard.denied_cmds.slice(0, 5)) out.push(`  - denied: \`${c}\``);
+out.push(`- bash-guard: ${R.guard.classified} classified · ${R.guard.denied} denies (${R.guard.distinct_denied} distinct commands) · ${R.guard.overridden} of them re-run with CC_CONFIRMED (the real false-positive signal) · ${R.guard.confirmed} CC_CONFIRMED runs in total`);
+for (const d of R.guard.denied_cmds.sort((a, b) => b.n - a.n).slice(0, 6)) out.push(`  - ${d.n}× ${d.rerun ? "**overridden** " : ""}\`${d.cmd.slice(0, 110)}\`${d.reason ? ` — ${d.reason.slice(0, 80)}` : ""}`);
 
 // ── shunt / cheap helpers ──────────────────────────────────────────────
 const shunt = rows("read-shunt.jsonl"), cw = rows("code-write.jsonl");

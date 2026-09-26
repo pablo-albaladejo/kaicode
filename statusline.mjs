@@ -227,13 +227,17 @@ function liveSubagents(sessionId, mainTranscript) {
   const dir = path.join(path.dirname(mainTranscript), sessionId, "subagents");
   let files = [];
   try { files = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl")).map((f) => path.join(dir, f)); } catch { return []; }
-  const stopped = new Set();
-  try { for (const l of fs.readFileSync(SUBAGENT_LOG, "utf8").split("\n")) if (l.includes(sessionId)) { try { const j = JSON.parse(l); if (j.agent_id) stopped.add(String(j.agent_id)); if (j.agent_transcript_path) stopped.add(j.agent_transcript_path); } catch {} } } catch {}
+  // id/path → time of its last SubagentStop. An agent continued with SendMessage writes to the same transcript after
+  // that stop, so "stopped" means: stopped AND nothing written since (else it is running again).
+  const stopped = new Map();
+  const mark = (k, t) => { if (k && t > (stopped.get(k) || 0)) stopped.set(k, t); };
+  try { for (const l of fs.readFileSync(SUBAGENT_LOG, "utf8").split("\n")) if (l.includes(sessionId)) { try { const j = JSON.parse(l); const t = j.ts ? new Date(j.ts).getTime() : Infinity; if (j.agent_id) mark(String(j.agent_id), t); mark(j.agent_transcript_path, t); } catch {} } } catch {}
   const now = Date.now(), res = [];
   for (const f of files) {
     const id = path.basename(f, ".jsonl").replace(/^agent-/, "");
     const st = fs.statSync(f);
-    if (stopped.has(id) || stopped.has(f) || now - st.mtimeMs > 10 * 60 * 1000) continue;
+    const stopAt = Math.max(stopped.get(id) || 0, stopped.get(f) || 0);
+    if ((stopAt && st.mtimeMs <= stopAt + 3000) || now - st.mtimeMs > 10 * 60 * 1000) continue;
     const entries = tailJsonl(f);
     let type = null;
     try { const meta = JSON.parse(fs.readFileSync(f.replace(/\.jsonl$/, ".meta.json"), "utf8")); type = meta.agentType || meta.agent_type || meta.subagent_type; } catch {}
@@ -248,7 +252,7 @@ function liveSubagents(sessionId, mainTranscript) {
     }
     const t0 = first.find((e) => e.timestamp)?.timestamp;
     const full = parseTranscript(f).usage;
-    res.push({ usd: full.unpriced ? null : full.usd, type: type.replace(/^aircall-aircode-agents:/, "aircode:"), model, ctx, out, calls, lastTool, ms: t0 ? now - new Date(t0).getTime() : 0, idle: now - st.mtimeMs });
+    res.push({ usd: full.unpriced ? null : full.usd, type: type.replace(/^aircall-aircode-agents:/, "aircode:"), model, ctx, out, calls, lastTool, ms: stopAt && isFinite(stopAt) ? now - stopAt : t0 ? now - new Date(t0).getTime() : 0, resumed: !!stopAt, idle: now - st.mtimeMs });
   }
   return res;
 }
@@ -394,7 +398,7 @@ const live = [];
 try {
   if (d.session_id && d.transcript_path) for (const a of liveSubagents(d.session_id, d.transcript_path)) {
     const secs = Math.round(a.ms / 1000);
-    live.push([paint("mag", "▶ " + a.type), paint("cyn", a.model),
+    live.push([paint("mag", "▶ " + a.type) + (a.resumed ? paint("dim", " (continued)") : ""), paint("cyn", a.model),
       paint(a.ctx > 150000 ? "red" : a.ctx > 80000 ? "yel" : "grn", `ctx ${k(a.ctx)}`) + paint("dim", ` · ${a.calls} calls · out ${k(a.out)}`) + (a.usd != null ? paint("grn", ` · ${usd(a.usd)}`) : ""),
       paint("dim", secs >= 60 ? `${Math.floor(secs / 60)}m${secs % 60}s` : `${secs}s`) + (() => { const m = agentMedian(a.type, a.model); return m ? paint(secs > m * 1.5 ? "yel" : "dim", `/~${fmtMin(m)}`) : ""; })() + (a.idle > 60000 ? paint("yel", " (idle)") : ""),
       paint("org", short(a.lastTool.replace(/\s+/g, " "), 40))].filter(Boolean));

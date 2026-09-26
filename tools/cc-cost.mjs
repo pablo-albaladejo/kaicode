@@ -470,7 +470,7 @@ if (opt("--ticket")) {
   const days = Number(opt("--days"));
   if (JSON_OUT) {
     const rs = listSessions(flag("--all"), Date.now() - days * 86400000).map(analyzeSession).filter((r) => r.calls.length);
-    console.log(JSON.stringify(rs.map((r) => ({ session: r.sessionId, branch: r.branch, start: new Date(r.start).toISOString(), ...r.tot, subagents: r.subs.length })), null, 2));
+    console.log(JSON.stringify(rs.map((r) => ({ session: r.sessionId, branch: r.branch, project: r.project, cwd: r.main.cwd || null, start: new Date(r.start).toISOString(), ...r.tot, subagents: r.subs.length })), null, 2));
   } else { reportRange(days, flag("--all")); console.log(out.join("\n")); }
 } else {
   const file = opt("--session") ? resolveSession(opt("--session")) : latestSessionFile();
