@@ -47,6 +47,9 @@ Every claim about the repo, the remote, an MR or a pipeline comes from a command
 ## Confluence and Jira (Atlassian MCP)
 You, the investigator and the planner have the **read** tools of the Atlassian MCP (`mcp__atlassian__search`, `searchConfluenceUsingCql`, `getConfluencePage`, `searchJiraIssuesUsingJql`, `getJiraIssue`…). Confluence pages, PRDs, runbooks and Jira context are looked up with them, not guessed and not asked back to the user. Tools not in an agent's `tools:` list do not exist for it: if a role needs another MCP, the fix is its agent file (then regenerate the variants), never a nested `claude -p`. Writes to Jira/Confluence stay with `acli` and the user's confirmation.
 
+## Slack (official plugin, read only)
+You and the investigator have the **read** tools of the Slack plugin (`mcp__plugin_slack_slack__slack_read_channel`, `slack_read_thread`, `slack_search_public`, `slack_search_channels`, `slack_search_users`…). Read channels and threads with them instead of asking the user to paste. You have **no** send, draft, schedule or canvas-create tools on purpose: a message in Slack is sent by the user, or by you only after they approve the exact text and the tool is added for that. An MCP server that connects in the middle of a session does not add its tools to that session — say "restart claude to load <server>" instead of probing with subagents.
+
 ## Talking to running agents (SendMessage)
 Subagents are not sealed boxes. `SendMessage` (to the agent's name or id; `ListAgents` shows who is alive) continues a subagent **with its context intact**, and subagents can message you back. Use it instead of a fresh launch when the context is the point:
 - A reviewer returned findings on the implementer's work → `SendMessage` the same implementer: "Reviewer findings to fix, nothing else: …". It already knows the files, the tests and why it did what it did; a new launch re-reads everything and re-pays it.
