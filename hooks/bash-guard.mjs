@@ -45,6 +45,28 @@ if (/code-write\.mjs/.test(cmd) && !/--report/.test(cmd)) {
     process.exit(0);
   }
 }
+// Secrets never reach the transcript (it goes to the gateway, Langfuse and the chat). A command that would PRINT a
+// credential value is denied — even with CC_CONFIRMED: the user can run it in their own shell. Using a secret without
+// printing it (VAR=$(jq …) then curl -H "…$VAR") is fine, and so is printing a masked form (| cut -c1-8, | wc -c,
+// | shasum, | keys, | length). Ad-hoc sed "redactions" do not count: one missed a xoxe.xoxp- token on 2026-09-26.
+{
+  const SECRET = "[A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|APIKEY|PRIVATE_KEY|ACCESS_KEY)\\b";
+  const readers = [
+    new RegExp(`\\bjq\\b[^|]*\\.${SECRET}`),                                                    // jq '.env.X_TOKEN'
+    new RegExp(`\\b(echo|printf|printenv)\\b[^|;&]*\\$?\\{?${SECRET}`),                          // echo $X_TOKEN
+    /\b(cat|less|more|head|tail|grep|rg|sed|awk|bat)\b[^|;&]*(\.env(\.[\w-]+)?\b|credentials\b|\.netrc\b|\.npmrc\b|\.pgpass\b|\.claude\.json\b)/,
+    /\bsecurity\s+find-(generic|internet)-password\b[^|;&]*\s-[wg]\b/,                           // keychain value
+    /\baws-vault\s+exec\b[^|;&]*--\s*env\b/,                                                      // dumps AWS keys
+  ];
+  const masked = /\|\s*(wc\b|shasum|sha\d+sum|md5|cut\s+-c\s*1-([1-9]|1[0-2])\b|head\s+-c\s*([1-9]|1[0-2])\b|jq\s+(-r\s+)?'?(keys|length))/;
+  const hit = cmd.split(/\n|&&|\|\||;/).map((x) => x.trim()).find((seg) => seg && !/^\w+=\$\(/.test(seg) && !/^(export\s+)?\w+=\S*\$\(/.test(seg) && readers.some((r) => r.test(seg)) && !masked.test(seg));
+  if (hit) {
+    log({ command: cmd.slice(0, 120), verdict: "destructive", confidence: 1, reason: "would print a secret", agent: input.agent_type || "main" });
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny",
+      permissionDecisionReason: `bash-guard: this would print a credential into the transcript (${hit.slice(0, 80)}). Check it without printing it: its shape with "| cut -c1-8", its length with "| wc -c", its keys with "jq 'keys'"; use it through a variable (T=$(jq -r … ~/.claude.json); curl -H "Authorization: Bearer $T" …) and print only the API's answer. Never ask the user to paste a credential in the chat: they put it in the config or env themselves.` } }));
+    process.exit(0);
+  }
+}
 if (/^\s*CC_CONFIRMED=1\s/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "confirmed", agent: input.agent_type || "main" }); process.exit(0); } // user said "run it"
 // --force-with-lease on a feature branch is how a rebased branch is pushed: a write, not a loss (the lease refuses to
 // overwrite what someone else pushed). Only main/master and a bare --force stay with the classifier.
