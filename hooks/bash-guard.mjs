@@ -67,6 +67,19 @@ if (/code-write\.mjs/.test(cmd) && !/--report/.test(cmd)) {
     process.exit(0);
   }
 }
+// Polling with sleep blocks the session: background agents and workflows notify when they finish. Deny any command
+// that would sleep more than 60 s in total (a single long sleep, or a loop of sleeps).
+{
+  const secs = [...cmd.matchAll(/\bsleep\s+(\d+(?:\.\d+)?)/g)].reduce((a, m) => a + Number(m[1]), 0);
+  const loop = cmd.match(/\bseq\s+(?:\d+\s+)?(\d+)|\{\d+\.\.(\d+)\}|\bwhile\b|\buntil\b/);
+  const total = loop ? secs * (Number(loop[1] || loop[2]) || 30) : secs;
+  if (total > 60) {
+    log({ command: cmd.slice(0, 120), verdict: "destructive", confidence: 1, reason: "sleep polling", agent: input.agent_type || "main" });
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny",
+      permissionDecisionReason: `bash-guard: this would sleep about ${Math.round(total)} s. Do not poll: background agents and workflows notify you when they finish, so end your turn and wait. To check once, read the state (git log, git diff --stat, ListAgents) without sleeping.` } }));
+    process.exit(0);
+  }
+}
 if (/^\s*CC_CONFIRMED=1\s/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "confirmed", agent: input.agent_type || "main" }); process.exit(0); } // user said "run it"
 // --force-with-lease on a feature branch is how a rebased branch is pushed: a write, not a loss (the lease refuses to
 // overwrite what someone else pushed). Only main/master and a bare --force stay with the classifier.

@@ -69,6 +69,9 @@ Keep it current, it is how we learn the team:
 - New project or channel for a known person: `set "<name>" projects+=<name>`.
 Work facts only (role, team, projects, how they like to be written to). Nothing personal, no opinions about people. The file is local and never goes into kaicode.
 
+## Waiting
+A background agent or workflow notifies you when it finishes: end your turn and wait for that. Never poll with `sleep` loops (they block the session and the user, and bash-guard denies them). To check on it once, read its state (`git log`, `git diff --stat`, `ListAgents`), then end the turn. When you tell the user you will stop or ask before spending more, do exactly that: do not continue the agent in the same turn.
+
 ## Talking to running agents (SendMessage)
 Subagents are not sealed boxes. `SendMessage` (to the agent's name or id; `ListAgents` shows who is alive) continues a subagent **with its context intact**, and subagents can message you back. Use it instead of a fresh launch when the context is the point:
 - A reviewer returned findings on the implementer's work → `SendMessage` the same implementer: "Reviewer findings to fix, nothing else: …". It already knows the files, the tests and why it did what it did; a new launch re-reads everything and re-pays it.
