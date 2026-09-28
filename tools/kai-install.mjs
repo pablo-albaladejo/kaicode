@@ -41,7 +41,8 @@ if (only.length && !argv.includes("--adopt")) files = files.filter((p) => only.i
 // --status: what changed locally since the last install
 if (argv.includes("--status")) {
   let n = 0;
-  for (const p of files) { const b = read(path.join(BASE, p)), d = read(path.join(DST, p)); if (!b || !d || sha(b) === sha(d)) continue; n++;
+  for (const p of files) { const d = read(path.join(DST, p)); if (d && fs.existsSync(path.join(DST, p) + ".kaicode-new")) console.log(`\n! ${p}: unresolved conflict — compare ${p} with ${p}.kaicode-new (merge attempt: ${p}.kaicode-conflict)`); }
+  for (const p of files) { const b = read(path.join(BASE, p)) || read(path.join(REPO, p)), d = read(path.join(DST, p)); if (!b || !d || sha(b) === sha(d)) continue; n++;
     console.log(`\n● ${p} changed in ~/.claude (adopt it: node ~/.claude-work/tools/kai-install.mjs --adopt ${p})`);
     try { execFileSync("diff", ["-u", path.join(BASE, p), path.join(DST, p)], { stdio: "inherit" }); } catch {} }
   console.log(n ? `\n${n} file(s) with local changes` : "no local changes in ~/.claude"); process.exit(0);
@@ -72,7 +73,7 @@ for (const p of files) {
   if (sha(local) === sha(src)) { if (!base || sha(base) !== sha(src)) write(path.join(BASE, p), src); tally.same++; clearSide(dstF); continue; }
   if (!base) { const b = bootstrapBase(p, local); base = b.base; boot = b.exact ? "" : " (first run: base guessed from git history)"; }
   if (base && sha(local) === sha(base)) { write(dstF, src, mode); write(path.join(BASE, p), src); tally.updated++; clearSide(dstF); say(`↑ ${p}`); continue; }
-  if (base && sha(src) === sha(base)) { tally.kept++; say(`= ${p}: local changes kept, nothing new upstream`); continue; }
+  if (base && sha(src) === sha(base)) { if (boot) write(path.join(BASE, p), base); tally.kept++; say(`= ${p}: local changes kept, nothing new upstream`); continue; }
   // changed on both sides → three-way merge
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "kai-")), [fl, fb, fs_] = ["local", "base", "new"].map((n) => path.join(tmp, n));
   fs.writeFileSync(fl, local); fs.writeFileSync(fb, base || Buffer.from("")); fs.writeFileSync(fs_, src);
@@ -81,7 +82,7 @@ for (const p of files) {
   catch (e) { merged = e.stdout; conflicts = e.status || 1; }
   fs.rmSync(tmp, { recursive: true, force: true });
   if (!conflicts) { write(dstF, merged, mode); write(path.join(BASE, p), src); tally.merged++; clearSide(dstF); say(`⇄ ${p}: merged, local changes kept${boot}`); }
-  else { write(dstF + ".kaicode-new", src); write(dstF + ".kaicode-conflict", merged); tally.conflict++;
+  else { if (boot && base) write(path.join(BASE, p), base); write(dstF + ".kaicode-new", src); write(dstF + ".kaicode-conflict", merged); tally.conflict++;
     say(`! ${p}: changed on both sides and the merge has ${conflicts} conflict(s)${boot}. Local file untouched; new version in ${p}.kaicode-new, merge attempt in ${p}.kaicode-conflict`); }
 }
 say(`${DRY ? "(dry run) " : ""}kai-install: ${tally.new} new · ${tally.updated} updated · ${tally.merged} merged · ${tally.kept} local kept · ${tally.conflict} conflict(s) · ${tally.same} already current`);
