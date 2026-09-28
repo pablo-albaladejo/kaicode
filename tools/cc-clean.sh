@@ -4,7 +4,8 @@
 #   1. finds the worktree and branch of the ticket, checks the MR is merged (glab) or the branch content is in origin/main
 #   2. archives .claude/ship/<T>/ to ~/.claude/logs/ship-archive/<T>-<date>/ (state, brief, plan — the retro reads them)
 #   3. git worktree remove · git branch -D (safe: content verified in main) · remote branch delete if still there
-#   4. --jira-done: comment "merged in <sha>" + transition to Done (asks unless --yes)
+#   4. --jira-done: comment "merged in <sha>" + transition to Done (asks unless --yes); the Done transition may have a
+#      screen requiring a resolution, which acli cannot set, so on failure the script tells you to close it by hand
 # Refuses when the tree is dirty, the branch has commits that are not in main, or the MR is not merged.
 set -uo pipefail
 T="${1:?usage: cc-clean <TICKET> [--jira-done] [--yes]}"; shift || true
@@ -48,10 +49,22 @@ if git -C "$MAINROOT" show-ref --verify --quiet "refs/remotes/origin/$BR"; then
 fi
 git -C "$MAINROOT" worktree prune
 # jira
+JIRA_OPEN=0
 if [ "$JIRA" = 1 ] && command -v acli >/dev/null; then
   MSHA="$(git -C "$MAINROOT" log --oneline "origin/$MAIN" --grep="$T" -1 | cut -c1-8)"
   if [ "$YES" = 1 ] || { read -r -p "  comment + transition $T to Done? [y/N] " a; [ "$a" = y ]; }; then
     acli jira workitem comment create --key "$T" --body "Merged into $MAIN in $MSHA${MR:+ (MR $MR)}." >/dev/null && echo "▸ Jira comment added"
-    acli jira workitem transition --key "$T" --status "Done" >/dev/null && echo "▸ Jira → Done"; fi
+    if OUT="$(acli jira workitem transition --key "$T" --status "Done" --yes 2>&1)"; then echo "▸ Jira → Done"
+    else JIRA_OPEN=1
+      echo "✗ Jira $T was NOT closed — the ticket is still open, and the branch and worktree are already gone"
+      [ -n "$OUT" ] && echo "$OUT" | sed 's/^/  /'
+      echo "  The Done transition for this project has a screen that requires a resolution, which acli cannot set"
+      echo "  (no --resolution, no --fields, no api command, in any version). Close $T by hand instead:"
+      echo "    • Jira UI: open $T, transition to Done and pick a resolution (e.g. \"Won't Do\")"
+      echo "    • or, from your own shell: POST /rest/api/3/issue/$T/transitions"
+      echo "      body: {\"transition\":{\"id\":\"<done-transition-id>\"},\"fields\":{\"resolution\":{\"name\":\"<Resolution>\"}}}"
+    fi
+  fi
 fi
-echo "✓ $T cleaned"
+if [ "$JIRA_OPEN" = 1 ]; then echo "✓ $T cleaned — Jira $T was NOT closed, do it by hand (see above)"
+else echo "✓ $T cleaned"; fi
