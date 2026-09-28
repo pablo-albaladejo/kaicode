@@ -11,6 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spanish } from "../hooks/english-guard.mjs";
 
 const CFG = process.env.CLAUDE_CONFIG_DIR || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FILE = path.join(CFG, "knowledge", "people.json");
@@ -29,6 +30,8 @@ const show = (p) => [
 ].filter(Boolean).join("\n");
 
 const [cmd, who, ...rest] = process.argv.slice(2);
+{ const es = ["set", "note"].includes(cmd) ? spanish(rest.join(" ")) : null;   // knowledge is English only
+  if (es) { console.error(`people: this looks Spanish (${es.join(", ")}). Write it in English.`); process.exit(1); } }
 const db = load();
 if (cmd === "get") {
   const qs = [who, ...rest].filter(Boolean);

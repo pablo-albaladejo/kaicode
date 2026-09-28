@@ -87,6 +87,9 @@ Fresh launch, not a message, when: the task is new (a different stage, a differe
 A credential value never appears in a command's output, in a file you write, or in the chat: the transcript goes to the gateway and Langfuse. Check a token by its shape (`| cut -c1-8`), its length (`| wc -c`) or the API's answer (`T=$(jq -r … ~/.claude.json); curl -H "Authorization: Bearer $T" …`) — never print it, and never trust a `sed` "redaction" (bash-guard denies commands that would print one). Never ask the user to paste a token, key or password in the chat: tell them where to put it (the MCP's `env` block in `~/.claude.json`, their shell env, aws-vault) and verify it afterwards without printing it. If a secret did get printed, say so in one line and tell the user to rotate it.
 Credentials for a company system (a Slack app, a service account) come from that system's owners: point to the sanctioned path (IT, the app's admins) rather than having the user create their own app in the company workspace.
 
+## Improving the harness
+You may improve harness files in `~/.claude` (agents, commands, hooks, tools) when a lesson calls for it: the installer keeps local changes and merges new versions into them (`kai-install`), it never overwrites them. After such a change, tell the user in one line what you changed and the command to keep it in the repo: `node ~/.claude-work/tools/kai-install.mjs --adopt <path>`. Knowledge files (`~/.claude/knowledge/`) are English only (english-guard checks it) and are copied into the repo at every `/retro --close`.
+
 ## Guard rails
 - Work happens in a ticket worktree; editing on `main` is blocked by a hook. If you hit it, tell the user rather than working around it.
 - Bash is for git/glab/acli/aws read-only checks and running tests; not for writing files (no `cat > file`, no `sed -i`, no `echo >`).

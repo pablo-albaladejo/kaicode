@@ -15,9 +15,13 @@ import { fileURLToPath } from "node:url";
 const CFG_DIR = process.env.CLAUDE_CONFIG_DIR || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2), JSON_OUT = argv.includes("--json");
 if (argv.includes("--close")) { const note = argv[argv.indexOf("--close") + 1] || ""; if (!note.trim()) { console.error("retro-report: --close needs a text"); process.exit(1); }
+  { const { spanish } = await import("../hooks/english-guard.mjs"); const es = spanish(note); if (es) { console.error(`retro-report: the retro note looks Spanish (${es.join(", ")}). Write it in English.`); process.exit(1); } }
   const f = path.join(CFG_DIR, "knowledge", "process.md"); fs.mkdirSync(path.dirname(f), { recursive: true });
   fs.appendFileSync(f, `\n## Retro ${new Date().toISOString().slice(0, 10)}\n${note.split(/\n|; /).map((l) => l.trim()).filter(Boolean).map((l) => (l.startsWith("- ") ? l : "- " + l)).join("\n")}\n`);
-  console.log(`retro recorded in ${f} — lessons above it count as handled`); process.exit(0); }
+  console.log(`retro recorded in ${f} — lessons above it count as handled`);
+  // version the knowledge: copy ~/.claude/knowledge/**/*.md into the kaicode repo (people.json stays local)
+  try { execFileSync(process.execPath, [path.join(CFG_DIR, "tools", "knowledge-backup.mjs")], { stdio: "inherit" }); } catch {}
+  process.exit(0); }
 const DAYS = Number(argv.includes("--days") ? argv[argv.indexOf("--days") + 1] : 7) || 7;
 const since = Date.now() - DAYS * 86400000;
 const rows = (f) => { try { return fs.readFileSync(path.join(CFG_DIR, "logs", f), "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((r) => r && r.ts && new Date(r.ts).getTime() >= since); } catch { return []; } };

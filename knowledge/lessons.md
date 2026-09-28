@@ -1,2 +1,5 @@
 # Lessons (personal / cross-repo) — appended by /ship Learn, pruned by hand or by /retro
 <!-- - YYYY-MM-DD TICKET repo: one-line lesson -->
+- 2026-09-25 APR-7558 conv-ai-settings: simulate `iam` policy against the role that actually carries the grant — a Lambda's configured role is not always the one holding the inline policy, and the wrong role returns `implicitDeny` and a false "misconfiguration".
+- 2026-09-26 APR-7618 next-actions: a green pipeline does NOT mean the environment has that commit — two pipelines on main can race and the OLDER commit's deploy lands last; always prove the deployed revision from the stack's artifact prefix (`next-actions/<sha8>/`) or the live definition, never from the pipeline colour.
+- 2026-09-26 APR-7618 next-actions: a legacy migration-catalogue row with `status=migrated` and no `region` turns a directed reverse migration into a source DELETE with no copy — the reclaim guard reads the row's region, so an absent row is the only safe pre-state; never hand-write a status row.

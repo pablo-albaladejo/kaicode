@@ -4,7 +4,7 @@
 # checked there). The guide itself is lead.md "Voice". Test any text: echo "…" | node ~/.claude/hooks/voice-lint.mjs --check
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"; DST="$HOME/.claude"; F="$DST/settings.json"
-cp "$SRC/hooks/voice-lint.mjs" "$DST/hooks/voice-lint.mjs"; echo "  ✓ hooks/voice-lint.mjs"
+node "$SRC/tools/kai-install.mjs" hooks/voice-lint.mjs
 cp "$F" "$F.bak-$(date +%Y%m%d-%H%M%S)"
 node - "$F" "$(command -v node)" "$DST" <<'JS'
 const fs = require("fs"), [f, node, dst] = process.argv.slice(2), d = JSON.parse(fs.readFileSync(f, "utf8"));

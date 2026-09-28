@@ -3,7 +3,7 @@
 # local only, not versioned). Installs the tool and seeds what we already know. Re-running only updates the seeds.
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"; DST="$HOME/.claude"
-cp "$SRC/tools/people.mjs" "$DST/tools/people.mjs"; echo "  ✓ tools/people.mjs"
+node "$SRC/tools/kai-install.mjs" tools/people.mjs hooks/english-guard.mjs
 P="node $DST/tools/people.mjs"
 $P set "Lidia Cancio Valle" role="UX Designer" slack=U07DS5JCHQU email=lidia.valle@aircall.io projects+=proj-ai-assist-activation \
   style="Designer: write about the user experience and the decision she has to make. No code, API, field or file names. Plain English (B1), short sentences, friendly, no dashes. 5 to 8 lines." source=user >/dev/null

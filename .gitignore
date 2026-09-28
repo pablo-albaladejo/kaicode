@@ -24,4 +24,5 @@ agents/*--*.md
 !templates/
 !templates/*
 !knowledge/
-!knowledge/*.md
+!knowledge/**/
+!knowledge/**/*.md

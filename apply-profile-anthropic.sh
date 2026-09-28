@@ -11,8 +11,7 @@ SRC="$HOME/.claude-work"; DST="$HOME/.claude"; P="$HOME/.claude-anthropic"; ZSHR
 NODE="$(command -v node)"; ok(){ printf '  \033[32m✓\033[0m %s\n' "$*"; }
 
 # 1. shared code in ~/.claude (both profiles run it)
-cp "$SRC/hooks/model-router.mjs" "$DST/hooks/"; cp "$SRC/tools/gen-effort-variants.mjs" "$SRC/tools/profile-sync.mjs" "$DST/tools/"; cp "$SRC/statusline.mjs" "$DST/"
-"$NODE" "$DST/tools/gen-effort-variants.mjs" >/dev/null; rm -f "$DST"/agents/lead--*.md "$DST"/agents/solo--*.md
+node "$SRC/tools/kai-install.mjs" hooks/model-router.mjs tools/gen-effort-variants.mjs tools/profile-sync.mjs statusline.mjs   # merges, never overwrites local changes
 ok "router profiles · profile-sync · statusline tag (gateway profile variants refreshed)"
 
 # 2. the profile: symlinks + derived settings/router/agents
