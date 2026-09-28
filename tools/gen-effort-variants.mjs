@@ -13,11 +13,15 @@ import { execFileSync } from "node:child_process";
 const CFG_DIR = process.env.CLAUDE_CONFIG_DIR || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIR = path.join(CFG_DIR, "agents");
 // (alias, effort) pairs from the router table + the model each alias maps to
-const cfg = JSON.parse(execFileSync(process.execPath, [path.join(CFG_DIR, "hooks", "model-router.mjs"), "--dump-config"], { encoding: "utf8" }));
-const PAIRS = [...new Set(Object.values(cfg.useCases).flatMap((u) => Object.values(u.levels).map(([a, e]) => `${a}-${e}`)))].sort();
+const dump = (env) => JSON.parse(execFileSync(process.execPath, [path.join(CFG_DIR, "hooks", "model-router.mjs"), "--dump-config"], { encoding: "utf8", env: { ...process.env, KAI_FABLE: "", KAI_ROUTER_PROFILE: "", ...env } }));
+const cfg = dump({});
+// every router profile can be switched on per session, so its variants must exist too (e.g. reviewer--fable-high)
+const profiled = Object.keys(cfg.profiles || {}).map((name) => dump({ KAI_ROUTER_PROFILE: name }));
+for (const c of profiled) Object.assign(cfg.models, c.models);
+const PAIRS = [...new Set([cfg, ...profiled].flatMap((c) => Object.values(c.useCases).flatMap((u) => Object.values(u.levels).map(([a, e]) => `${a}-${e}`))))].sort();
 const MARK = "# generated-by: gen-effort-variants (do not edit; edit the base agent and re-run)";
 const isVariant = (f) => /--(?:[a-z0-9]+-)?(low|medium|high|xhigh|max)\.md$/.test(f);
-const PRIMARY = new Set(["lead.md", "solo.md", "task.md"]); // primary (main-session) agents: never launched by the router, no variants
+const PRIMARY = new Set(["lead.md", "lead-fable.md", "solo.md", "task.md"]); // primary (main-session) agents: never launched by the router, no variants
 
 const files = fs.readdirSync(DIR).filter((f) => f.endsWith(".md"));
 if (process.argv.includes("--clean")) {

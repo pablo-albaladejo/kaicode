@@ -295,6 +295,8 @@ const l1 = [];
 if (d.agent?.name) l1.push(paint("mag", d.agent.name.replace(/^aircall-aircode-agents:/, "aircode:")));
 const model = d.model?.id || d.model?.display_name || "?";
 l1.push(paint("cyn", model) + (d.effort?.level ? paint("dim", ` (${d.effort.level})`) : "") + (d.fast_mode ? paint("yel", " ⚡") : ""));
+// second profile (claude-anthropic): say which one this is, and whether Fable is on
+if (/-anthropic\/?$/.test(process.env.CLAUDE_CONFIG_DIR || "")) l1.push(paint("mag", "anthropic") + (process.env.KAI_FABLE ? paint("yel", ` fable:${process.env.KAI_FABLE}`) : ""));
 const cw = d.context_window || {};
 const pct = Math.round(cw.used_percentage ?? 0);
 const pcol = pct >= 80 ? "red" : pct >= 50 ? "yel" : "grn";

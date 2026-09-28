@@ -125,10 +125,18 @@ function loadConfig() {
   try { user = JSON.parse(fs.readFileSync(path.join(CFG_DIR, "router.json"), "utf8")); } catch {}
   const cfg = { ...DEFAULT_CONFIG, ...user };
   cfg.models = { ...DEFAULT_CONFIG.models, ...(user.models || {}) };
-  cfg.useCases = { ...DEFAULT_CONFIG.useCases };
+  cfg.useCases = JSON.parse(JSON.stringify(DEFAULT_CONFIG.useCases));
   for (const [k, v] of Object.entries(user.useCases || {})) cfg.useCases[k] = { ...(DEFAULT_CONFIG.useCases[k] || {}), ...v, levels: { ...(DEFAULT_CONFIG.useCases[k]?.levels || {}), ...(v.levels || {}) } };
   cfg.jevCriteria = { ...DEFAULT_CONFIG.jevCriteria, ...(user.jevCriteria || {}) };
   cfg.roles = { ...DEFAULT_CONFIG.roles, ...(user.roles || {}) };
+  // Profiles: named overlays in router.json ("profiles": {"fable": {"models": {…}, "remap": {"opus": "fable"}}}), switched on
+  // per session by env (KAI_FABLE=critical|all → "fable"; KAI_ROUTER_PROFILE=<name> for any other). "remap" moves every
+  // level that uses one alias to another, so variants stay named by alias (reviewer--fable-high ≠ reviewer--opus-high).
+  const active = [process.env.KAI_ROUTER_PROFILE, process.env.KAI_FABLE ? "fable" : null].filter(Boolean);
+  for (const name of active) { const pr = user.profiles?.[name]; if (!pr) continue;
+    Object.assign(cfg.models, pr.models || {});
+    for (const [from, to] of Object.entries(pr.remap || {})) for (const uc of Object.values(cfg.useCases)) for (const cx of Object.keys(uc.levels || {})) if (uc.levels[cx]?.[0] === from) uc.levels[cx] = [to, uc.levels[cx][1]];
+    cfg.activeProfiles = [...(cfg.activeProfiles || []), name]; }
   return cfg;
 }
 const resolve = (cfg, uc, cx) => {
