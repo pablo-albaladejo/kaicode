@@ -24,7 +24,9 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DST = path.join(os.homedir(), ".claude"), BASE = path.join(DST, ".kaicode", "base");
 const argv = process.argv.slice(2), DRY = argv.includes("--dry-run"), QUIET = argv.includes("--quiet");
 const only = argv.filter((a) => !a.startsWith("--"));
-const TRACK = /^(agents\/[^/]+\.md|commands\/.+|hooks\/[^/]+|tools\/.+|templates\/[^/]+|statusline\.mjs)$/;
+const TRACK = /^(agents\/[^/]+\.md|commands\/.+|hooks\/[^/]+|tools\/.+|templates\/[^/]+|skill-src\/.+|statusline\.mjs)$/;
+// skills live in the repo under skill-src/ (a folder named skills/ is reserved by the Cowork bridge) and install to ~/.claude/skills/
+const dstOf = (p) => p.replace(/^skill-src\//, "skills/");
 const isVariant = (p) => /^agents\/.+--(?:[a-z0-9]+-)?(low|medium|high|xhigh|max)\.md$/.test(p);
 const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
 const read = (f) => { try { return fs.readFileSync(f); } catch { return null; } };
@@ -45,11 +47,11 @@ if (argv.includes("--status")) {
   const REV = path.join(REPO, ".kaicode-review"); for (const x of ["local", "base"]) fs.rmSync(path.join(REV, x), { recursive: true, force: true }); fs.mkdirSync(REV, { recursive: true });
   const diffs = [];
   let n = 0;
-  for (const p of files) { const d = read(path.join(DST, p)); if (d && fs.existsSync(path.join(DST, p) + ".kaicode-new")) console.log(`\n! ${p}: unresolved conflict — compare ${p} with ${p}.kaicode-new (merge attempt: ${p}.kaicode-conflict)`); }
-  for (const p of files) { const b = read(path.join(BASE, p)) || read(path.join(REPO, p)), d = read(path.join(DST, p)); if (!b || !d || sha(b) === sha(d)) continue; n++;
+  for (const p of files) { const d = read(path.join(DST, dstOf(p))); if (d && fs.existsSync(path.join(DST, dstOf(p)) + ".kaicode-new")) console.log(`\n! ${p}: unresolved conflict — compare ${p} with ${p}.kaicode-new (merge attempt: ${p}.kaicode-conflict)`); }
+  for (const p of files) { const b = read(path.join(BASE, p)) || read(path.join(REPO, p)), d = read(path.join(DST, dstOf(p))); if (!b || !d || sha(b) === sha(d)) continue; n++;
     console.log(`\n● ${p} changed in ~/.claude (adopt it: node ~/.claude-work/tools/kai-install.mjs --adopt ${p})`);
-    let df = ""; try { execFileSync("diff", ["-u", path.join(BASE, p), path.join(DST, p)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch (e) { df = String(e.stdout || ""); }
-    if (!fs.existsSync(path.join(BASE, p))) { try { execFileSync("diff", ["-u", path.join(REPO, p), path.join(DST, p)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch (e) { df = String(e.stdout || ""); } }
+    let df = ""; try { execFileSync("diff", ["-u", path.join(BASE, p), path.join(DST, dstOf(p))], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch (e) { df = String(e.stdout || ""); }
+    if (!fs.existsSync(path.join(BASE, p))) { try { execFileSync("diff", ["-u", path.join(REPO, p), path.join(DST, dstOf(p))], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch (e) { df = String(e.stdout || ""); } }
     process.stdout.write(df); diffs.push(`● ${p}\n${df}`);
     for (const [dir, buf] of [["local", d], ["base", b]]) { const f = path.join(REV, dir, p); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, buf); } }
   fs.writeFileSync(path.join(REV, "status.diff"), `${new Date().toISOString()}\n${diffs.join("\n")}\n${n} file(s) with local changes\n`);
@@ -57,7 +59,7 @@ if (argv.includes("--status")) {
 }
 // --adopt: local improvement → repo
 if (argv.includes("--adopt")) {
-  for (const p of only) { const d = read(path.join(DST, p)); if (!d) { console.log(`✗ ${p}: not in ~/.claude`); continue; }
+  for (const p of only) { const d = read(path.join(DST, dstOf(p))); if (!d) { console.log(`✗ ${p}: not in ~/.claude`); continue; }
     write(path.join(REPO, p), d); write(path.join(BASE, p), d); console.log(`✓ ${p}: ~/.claude version copied into the repo — review and commit it`); }
   process.exit(0);
 }
@@ -65,7 +67,7 @@ if (argv.includes("--adopt")) {
 // base for a file installed before kai-install existed: the repo version it matches, else the one current at its mtime
 function bootstrapBase(p, local) {
   let commits = []; try { commits = git("log", "--format=%H %ct", "--", p).toString().trim().split("\n").filter(Boolean).map((l) => l.split(" ")); } catch {}
-  const mt = fs.statSync(path.join(DST, p)).mtimeMs / 1000; let atTime = null;
+  const mt = fs.statSync(path.join(DST, dstOf(p))).mtimeMs / 1000; let atTime = null;
   for (const [h, t] of commits) { let c; try { c = git("show", `${h}:${p}`); } catch { continue; }
     if (sha(c) === sha(local)) return { base: c, exact: true };
     if (!atTime && Number(t) <= mt) atTime = c; }
@@ -75,7 +77,7 @@ function bootstrapBase(p, local) {
 const tally = { new: 0, updated: 0, same: 0, kept: 0, merged: 0, conflict: 0 };
 const clearSide = (f) => { if (DRY) return; for (const x of [".kaicode-new", ".kaicode-conflict"]) try { fs.unlinkSync(f + x); } catch {} };
 for (const p of files) {
-  const src = read(path.join(REPO, p)), dstF = path.join(DST, p), local = read(dstF), mode = p.endsWith(".sh") ? 0o755 : undefined;
+  const src = read(path.join(REPO, p)), dstF = path.join(DST, dstOf(p)), local = read(dstF), mode = p.endsWith(".sh") ? 0o755 : undefined;
   let base = read(path.join(BASE, p)), boot = "";
   if (!local) { write(dstF, src, mode); write(path.join(BASE, p), src); tally.new++; say(`+ ${p}`); continue; }
   if (sha(local) === sha(src)) { if (!base || sha(base) !== sha(src)) write(path.join(BASE, p), src); tally.same++; clearSide(dstF); continue; }

@@ -5,6 +5,8 @@
 //  SubagentStop (implementer*): the final report must contain "Status: done|partial|blocked", "Tests: … failed 0" and
 //    "Lint: clean". "done" with red tests/lint or a missing format is sent back ONCE (decision: block, with the reason)
 //    so the implementer fixes or downgrades to partial; the result is written to state.implement_result for the lead.
+//    "done" is also checked against facts: no --no-verify commit, test count not lower than the best earlier run,
+//    a test file changed when source changed, and every new export used outside its file (or declared "unwired:").
 //  PreToolUse Bash: `glab mr create` needs verdicts.code = APPROVE (the code review gate) · `git push` needs the same,
 //    or an MR already open (fix rounds after the MR) · both need the branch rebased on origin/main with a fetch less
 //    than 15 min old (the sync gate). Anything else passes.
@@ -50,14 +52,45 @@ if (d.hook_event_name === "SubagentStop") {
   const tests = text.match(/^\s*Tests:.*$/im)?.[0] || null;
   const failed = tests ? Number((tests.match(/failed\s+(\d+)/i) || [])[1] ?? NaN) : NaN;
   const lintClean = /\bLint:\s*clean/i.test(text);
-  const ok = status === "done" && failed === 0 && lintClean;
+  // Facts checked from the repo and the transcript, not from the report (retro 2026-10-14: "done" for code nobody
+  // called, "passed 43" that were files, --no-verify commits).
+  const passed = tests ? Number((tests.match(/passed\s+(\d+)/i) || [])[1] ?? NaN) : NaN;
+  const facts = [];
+  if (status === "done") {
+    let cmds = [];
+    if (d.agent_transcript_path) { try { for (const l of fs.readFileSync(d.agent_transcript_path, "utf8").split("\n")) { try { const e = JSON.parse(l); for (const b of e.message?.content || []) if (b.type === "tool_use" && b.name === "Bash") cmds.push(String(b.input?.command || "")); } catch {} } } catch {} }
+    if (cmds.some((c) => /\bgit\b[^|;&]*\bcommit\b[^|;&]*--no-verify|HUSKY=0|SKIP_HOOKS=1/.test(c))) facts.push("you committed with --no-verify (or hooks disabled). Undo that commit (git reset --soft HEAD~1), make the pre-commit checks pass, and commit again without skipping hooks");
+    const prev = Number(st.s.tests_max || 0);
+    if (!Number.isNaN(passed) && prev && passed < prev) facts.push(`Tests says passed ${passed}, but an earlier run on this ticket passed ${prev}. Count TESTS, not test files (vitest: the "Tests  N passed" line), and run the same suite`);
+    const base = git("merge-base origin/main HEAD", cwd) || git("merge-base origin/master HEAD", cwd);
+    if (base) {
+      const changed = git(`diff --name-only ${base}`, cwd).split("\n").filter(Boolean);
+      const isTest = (f) => /(^|\/)(__tests__|tests?|spec)\/|\.(test|spec)\.[a-z]+$|_test\.(go|py)$|test_[^/]+\.py$/.test(f);
+      const isSrc = (f) => /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rb|java|kt|cs|rs)$/.test(f) && !isTest(f) && !/(^|\/)(migrations?|generated|__generated__)\//.test(f);
+      if (changed.some(isSrc) && !changed.some(isTest)) facts.push("source files changed on this branch but no test file was added or changed. Add the test that proves the step (see the plan's test: line)");
+      const added = git(`diff -U0 ${base} -- ${changed.filter(isSrc).map((f) => `'${f.replace(/'/g, "")}'`).join(" ") || "."}`, cwd);
+      const unwired = [];
+      let curFile = null;
+      for (const line of added.split("\n")) {
+        const fm = line.match(/^\+\+\+ b\/(.+)$/); if (fm) { curFile = fm[1]; continue; }
+        const m = line.match(/^\+\s*export\s+(?:default\s+)?(?:async\s+)?(?:function\*?|const|let|class)\s+([A-Za-z_$][\w$]{2,})/);
+        if (!m || !curFile) continue;
+        const uses = git(`grep -lw -- ${m[1]}`, cwd).split("\n").filter((f) => f && f !== curFile && !isTest(f));
+        if (!uses.length && !new RegExp(`unwired:[^\n]*\\b${m[1]}\\b`, "i").test(text)) unwired.push(`${m[1]} (${curFile})`);
+      }
+      if (unwired.length) facts.push(`new exports that nothing outside their file and tests uses: ${unwired.slice(0, 6).join(", ")}. Wire them where the plan says (wire:), or if that is a later step say so in Notes as "unwired: <name> — step <n>"`);
+    }
+  }
+  if (!Number.isNaN(passed) && passed > Number(st.s.tests_max || 0) && failed === 0) st.s.tests_max = passed;
+  const ok = status === "done" && failed === 0 && lintClean && !facts.length;
   const already = !!d.stop_hook_active || (st.s.implement_result?.blocked_once === true);
-  st.s.implement_result = { ts: new Date().toISOString(), agent: d.agent_type, status, tests, failed: Number.isNaN(failed) ? null : failed, lint_clean: lintClean, ok, blocked_once: already };
+  st.s.implement_result = { ts: new Date().toISOString(), agent: d.agent_type, status, tests, failed: Number.isNaN(failed) ? null : failed, lint_clean: lintClean, facts, ok, blocked_once: already };
   let reason = null;
   if (!status) reason = "Your final message must follow the output format exactly: `Status: done | partial | blocked`, `Branch:`, `Changed:`, `Tests: <command> → passed X / failed Y`, `Lint: clean | N issues`, `Notes:`. Re-send it in that format.";
   else if (status === "done" && !(failed === 0)) reason = `You reported Status: done but the Tests line is "${tests || "missing"}". Either make the tests pass (failed 0) and report again, or report Status: partial with what fails.`;
   else if (status === "done" && !lintClean) reason = "You reported Status: done but Lint is not clean. Fix the lint issues (or report Status: partial and list them).";
-  if (reason && !already) { st.s.implement_result.blocked_once = true; hist("gate implement: blocked once", reason); save(); log({ gate: "implement", ticket: st.s.ticket, action: "block", status, failed, lintClean }); out({ decision: "block", reason: `ship-gate: ${reason}` }); }
+  else if (facts.length) reason = `You reported Status: done, but the gate found: ${facts.map((f, i) => `(${i + 1}) ${f}`).join(" ")}. Fix these and report again, or report Status: partial and say what is left.`;
+  if (reason && !already) { st.s.implement_result.blocked_once = true; hist("gate implement: blocked once", reason); save(); log({ gate: "implement", ticket: st.s.ticket, action: "block", status, failed, lintClean, facts: facts.length }); out({ decision: "block", reason: `ship-gate: ${reason}` }); }
   hist(ok ? "gate implement: pass" : `gate implement: fail (${status || "no format"})`, tests); save();
   log({ gate: "implement", ticket: st.s.ticket, action: ok ? "pass" : "fail", status, failed, lintClean, already });
   process.exit(0);

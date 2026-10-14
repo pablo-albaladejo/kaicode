@@ -15,7 +15,7 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const Q = path.join(REPO, ".kaicode-queue"), OUT = path.join(REPO, ".kaicode-review", "out");
 const CL = path.join(os.homedir(), ".claude"), LOG = path.join(CL, "logs", "kai-runner.log");
 const NODE = process.execPath, KAI = path.join(REPO, "tools", "kai-install.mjs");
-const SAFE_PATH = /^(agents|commands|hooks|tools|templates)\/[A-Za-z0-9._\/-]+$|^statusline\.mjs$/;
+const SAFE_PATH = /^(agents|commands|hooks|tools|templates|skill-src)\/[A-Za-z0-9._\/-]+$|^statusline\.mjs$/;
 const LOGS = { sweep: "sweep.log", runner: "kai-runner.log", router: "model-router.jsonl", guards: "guards.jsonl" };
 const paths = (a) => { const bad = a.filter((p) => !SAFE_PATH.test(p) || p.includes("..")); if (bad.length) throw new Error(`not a harness path: ${bad.join(" ")}`); if (!a.length) throw new Error("give at least one path"); return a; };
 
@@ -30,6 +30,12 @@ const ALLOW = {
   "ls":         (a) => { const d = a[0] || "."; if (!/^(agents|commands|hooks|tools|templates|knowledge|logs|\.kaicode)(\/[A-Za-z0-9._-]+)*$|^\.$/.test(d)) throw new Error("ls a harness folder"); return ["ls", ["-la", path.join(CL, d)]]; },
   "settings":   () => [NODE, ["-e", `const s=JSON.parse(require("fs").readFileSync(${JSON.stringify(path.join(CL, "settings.json"))},"utf8"));for(const k of Object.keys(s.env||{}))if(/KEY|TOKEN|SECRET|PASS/i.test(k))s.env[k]="<hidden>";delete s.apiKeyHelper;console.log(JSON.stringify(s,null,2))`]],
   "router":     () => ["cat", [path.join(CL, "router.json")]],
+  "router-set": (a) => { if (a.length !== 2) throw new Error("router-set <key> <json>"); return [NODE, [path.join(REPO, "tools", "router-set.mjs"), a[0], a[1]]]; },
+  "jira-get":   (a) => { if (!/^[A-Z][A-Z0-9]+-\d+$/.test(a[0] || "")) throw new Error("jira-get <KEY>"); return [NODE, [path.join(REPO, "tools", "jira-api.mjs"), "get", a[0]]]; },
+  "scrub-logs": () => [NODE, [path.join(REPO, "tools", "log-scrub.mjs"), path.join(CL, "logs")]],
+  "retro":      (a) => [NODE, [path.join(CL, "tools", "retro-report.mjs"), "--days", String(Math.min(60, Math.max(1, parseInt(a[0] || "7", 10) || 7)))]],
+  // read-only copy of the harness logs (and the ship archive) into .kaicode-review/logs for analysis
+  "logs-copy":  () => ["rsync", ["-a", "--delete", "--include=*/", "--include=*.jsonl", "--include=*.log", "--include=*.json", "--include=*.md", "--exclude=*", path.join(CL, "logs") + "/", path.join(REPO, ".kaicode-review", "logs") + "/"]],
 };
 
 const log = (m) => { try { fs.mkdirSync(path.dirname(LOG), { recursive: true }); fs.appendFileSync(LOG, `${new Date().toISOString()} ${m}\n`); } catch {} };

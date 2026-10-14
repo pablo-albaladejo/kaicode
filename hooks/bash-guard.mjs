@@ -11,12 +11,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { redactDeep } from "./redact.mjs";
 
 const CFG_DIR = process.env.CLAUDE_CONFIG_DIR || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOG = path.join(CFG_DIR, "logs", "bash-guard.jsonl");
 const DEFAULTS = { bashGuardMode: "on", bashGuardMinConfidence: 0.6, jevUrl: "https://api.llmgateway.io/v1/systemone", jevModel: "jev-1.13.0", jevKeyEnv: "JEV_LLMGATEWAY_KEY", jevTimeoutMs: 4000 };
 let cfg = DEFAULTS; try { cfg = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(path.join(CFG_DIR, "router.json"), "utf8")) }; } catch {}
-const log = (o) => { try { fs.mkdirSync(path.dirname(LOG), { recursive: true }); fs.appendFileSync(LOG, JSON.stringify({ ts: new Date().toISOString(), ...o }) + "\n"); } catch {} };
+const log = (o) => { try { fs.mkdirSync(path.dirname(LOG), { recursive: true }); fs.appendFileSync(LOG, JSON.stringify(redactDeep({ ts: new Date().toISOString(), ...o })) + "\n"); } catch {} }; // never a credential in the log
 
 // Tokens that make a command worth a look. Anything else passes silently.
 const RISKY = /(^|[\s;&|(])(rm|rmdir|unlink|mv|chmod|chown|truncate|dd|mkfs|shred|sudo|kill|pkill|killall)\b|git\s+(push|reset|clean|branch\s+-[dD]|checkout\s+--|restore|rebase|filter-branch|update-ref|reflog\s+expire|gc|stash\s+(drop|clear)|worktree\s+remove|remote\s+(remove|rm)|tag\s+-d)|glab\s+(mr\s+(approve|merge|close|update|delete|note|rebase)|repo\s+(delete|archive)|issue\s+(close|delete)|release\s+delete|variable\s+(set|delete)|api\s+.*-X\s*(POST|PUT|DELETE|PATCH))|aws\s+(?!sts\b|.*\b(describe|list|get)-)|kubectl\s+(delete|apply|patch|scale|rollout|exec|drain|cordon)|terraform\s+(apply|destroy|import|state\s+(rm|mv|push))|docker\s+(rm|rmi|system\s+prune|kill)|npm\s+(publish|unpublish|deprecate)|curl\s+.*-X\s*(POST|PUT|DELETE|PATCH)|(^|[^>])>\s*\/|>\s*~|\bacli\b.*\b(delete|transition|assign|close)\b/i;
@@ -81,6 +82,13 @@ if (/code-write\.mjs/.test(cmd) && !/--report/.test(cmd)) {
   }
 }
 if (/^\s*CC_CONFIRMED=1\s/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "confirmed", agent: input.agent_type || "main" }); process.exit(0); } // user said "run it"
+// tools/jira-api.mjs create makes a Jira ticket under the user's name: the user approves the shown draft first.
+if (/jira-api\.mjs["']?\s+create\b/.test(cmd) && !/--dry-run\b/.test(cmd)) {
+  log({ command: cmd.slice(0, 300), verdict: "destructive", confidence: 1, reason: "jira create without confirmation", agent: input.agent_type || "main" });
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny",
+    permissionDecisionReason: `bash-guard: jira-api create makes a real ticket. Run it with --dry-run, show the user the title, fields and full text, and only after they say "create it" re-run it once prefixed with CC_CONFIRMED=1.` } }));
+  process.exit(0);
+}
 // tools/jira-qa-done.sh sets QA Sub-Status = Done (the automation then moves the ticket): a ticket decision, so its write
 // form needs the user's words and CC_CONFIRMED=1 (handled above). `--check` is read-only. It reads the token itself.
 {

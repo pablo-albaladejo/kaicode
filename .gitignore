@@ -30,3 +30,6 @@ agents/*--*.md
 .kaicode-review/
 .kai-status.diff
 .kaicode-queue/
+!skill-src/
+!skill-src/**/
+!skill-src/**/*.md

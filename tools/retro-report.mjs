@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+const { redact } = await import(new URL("../hooks/redact.mjs", import.meta.url));
 
 const CFG_DIR = process.env.CLAUDE_CONFIG_DIR || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2), JSON_OUT = argv.includes("--json");
@@ -101,4 +102,4 @@ H("Process lessons since the last retro");
 if (!lessons.length) out.push("- none recorded");
 for (const l of lessons) out.push(l);
 
-if (JSON_OUT) console.log(JSON.stringify(R, null, 2)); else console.log(`# Retro — last ${DAYS} days (${new Date().toISOString().slice(0, 10)})` + out.join("\n"));
+if (JSON_OUT) console.log(redact(JSON.stringify(R, null, 2))); else console.log(redact(`# Retro — last ${DAYS} days (${new Date().toISOString().slice(0, 10)})` + out.join("\n")));

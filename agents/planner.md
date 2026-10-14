@@ -28,7 +28,9 @@ The brief may carry `Facts:` lines (measurements, answers obtained before planni
 - Read `openspec/specs/` (if present), the code the change touches, and recent related MRs (`glab mr list --merged --search <topic>`), before writing anything.
 - Prefer the smallest change that meets the requirement. Call out what is ambiguous instead of deciding silently.
 - For an ADR: list 2-4 real options, each with cost, risk, reversibility and migration path; recommend one and say what would change your mind.
-- Size every step so that `implementer` can do it in one run (roughly: a few files, one test suite).
+- Size every step so that `implementer` finishes it in one run with turns to spare: **at most 3 source files per step** (their test files do not count), one test file or suite, and a `test:` command that runs only those tests (e.g. `npx vitest run src/x.test.ts`). A bigger step is two steps. Evidence: implement runs on 4+ file steps hit the turn limit on most tickets (retro 2026-10-14).
+- **Every step compiles on its own.** If step N only builds after step N+1 (a new type used before it exists, a renamed export), merge them into one step or reorder; the pre-commit compile gate otherwise forces `--no-verify` (APR-7869).
+- **Name the call sites.** A step that adds a function, resolver, handler or field says where it gets called or registered (`wire: path:symbol`); "done when" includes that the caller uses it. A new function nobody calls is not done (APR-7821).
 
 ## Asking instead of guessing
 You can message the lead (`SendMessage`) and it can message you back with your context intact. When you need a decision or a fact only the lead or another agent has (a measurement, a chosen option, what the planner meant), ask in one message with your default and continue if you can; do not guess silently and do not stop with `blocked` for something one question resolves. When the lead sends you follow-up work, treat it as part of the same task: you already have the context, do not re-read the tree.
@@ -41,7 +43,7 @@ Complexity: low | medium | high — and why (one line)
 Risk: low | medium | high — high = touches auth, money, data migrations, public contracts, or > 15 files
 Files: <n> (distinct files the steps touch)
 Steps:
-1. <what> — files: path, path — done when: <observable check>
+1. <what> — files: path, path (≤ 3) — wire: path:symbol (or none) — test: <narrow command> — done when: <observable check>
 2. …
 Covers: acceptance criterion → step number (only when acceptance was given)
 Open questions: (max 5, each with your default answer if nobody replies)

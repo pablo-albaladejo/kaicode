@@ -23,7 +23,11 @@ import { execSync } from "node:child_process";
 
 const CFG_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
 let cfg = {}; try { cfg = JSON.parse(fs.readFileSync(path.join(CFG_DIR, "router.json"), "utf8")); } catch {}
-const BUDGET = Number(cfg.shipBudgetUsd ?? 5), MAX = Number(cfg.shipMaxAttempts ?? 2);
+const BUDGET = Number(cfg.shipBudgetUsd ?? 8), MAX = Number(cfg.shipMaxAttempts ?? 2);
+// Budget follows the plan size once the plan exists (retro 2026-10-14: a flat $5 stopped tickets mid-way; an
+// understand that reads a spec alone used 82% of it). A budget the user set with --budget is never changed.
+const BY_SIZE = { S: 8, M: 15, L: 30, ...(cfg.shipBudgetBySize || {}) };
+const sizeOf = (p) => { const f = Number(p?.files || 0), n = Number(p?.steps || 0); return f > 10 || n > 6 ? "L" : f > 3 || n > 3 ? "M" : "S"; };
 const STAGES = ["prepare", "understand", "gate-facts", "plan", "review-plan", "gate-human", "implement", "review-code", "stop-mr", "open-mr", "pipeline", "review-mr", "feedback", "close", "ready-for-merge"];
 const git = (a, cwd) => { try { return execSync(`git ${a}`, { cwd, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; } };
 const die = (m, code = 1) => { console.error("ship-state: " + m); process.exit(code); };
@@ -79,7 +83,11 @@ switch (cmd) {
   case "set": {
     const t = resolveTicket(rest[0]); const s = load(t);
     for (const kv of rest.slice(1)) { const i = kv.indexOf("="); if (i < 0) die(`bad assignment ${kv}`); setPath(s, kv.slice(0, i), parseVal(kv.slice(i + 1))); }
-    hist(s, "set", rest.slice(1).map((x) => x.slice(0, 60)).join(" ")); save(s); console.log("ok"); break;
+    if (rest.slice(1).some((kv) => kv.startsWith("budget_usd="))) s.budget_source = "user";
+    let note = "";
+    if (s.budget_source !== "user" && rest.slice(1).some((kv) => /^plan(\.files|\.steps|=)/.test(kv))) {
+      const size = sizeOf(s.plan), b = BY_SIZE[size]; if (b > Number(s.budget_usd || 0)) { s.budget_usd = b; note = ` · plan size ${size} → budget $${b}`; } }
+    hist(s, "set", rest.slice(1).map((x) => x.slice(0, 60)).join(" ") + note); save(s); console.log("ok" + note); break;
   }
   case "attempt": {
     const t = resolveTicket(rest[0]); const g = rest[1] || die("usage: ship-state attempt <T> <gate>"); const s = load(t);
