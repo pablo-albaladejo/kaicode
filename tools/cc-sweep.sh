@@ -20,7 +20,12 @@ while read -r W B; do
   b=${B#refs/heads/}; [ -z "$b" ] || [ "$b" = "$MAIN" ] && continue
   t="$(echo "$b" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -1)"; [ -n "$t" ] || continue
   case "$HERE/" in "$W"/*) continue;; esac                                     # the worktree we are in
-  git -C "$MAINROOT" merge-base --is-ancestor "refs/heads/$b" "origin/$MAIN" 2>/dev/null || echo "$MERGED_SRC" | grep -qx "$b" || continue
+  if git -C "$MAINROOT" merge-base --is-ancestor "refs/heads/$b" "origin/$MAIN" 2>/dev/null; then
+    # a branch sitting exactly on origin/main has no work of its own: it was just created, it was not merged
+    [ "$(git -C "$MAINROOT" rev-parse "refs/heads/$b")" = "$(git -C "$MAINROOT" rev-parse "origin/$MAIN")" ] && { say "• $t: branch $b has no commits yet — left alone"; continue; }
+  else
+    echo "$MERGED_SRC" | grep -qx "$b" || continue
+  fi
   [ -n "$(git -C "$W" status --porcelain 2>/dev/null)" ] && { say "• $t: merged but dirty tree at $W — left for you"; continue; }
   if command -v lsof >/dev/null && lsof -a -d cwd -Fn 2>/dev/null | grep -q "^n$W"; then say "• $t: merged, but a process (a claude session?) still lives in $W — left alone"; continue; fi
   if [ "$DRY" = 1 ]; then say "▸ would clean $t ($b · $W)"; continue; fi
@@ -29,7 +34,12 @@ done < <(git -C "$MAINROOT" worktree list --porcelain | awk '/^worktree /{w=$2} 
 # merged local branches without a worktree
 for b in $(git -C "$MAINROOT" for-each-ref --format='%(refname:short)' refs/heads/ | grep -E '[A-Z][A-Z0-9]+-[0-9]+'); do
   git -C "$MAINROOT" worktree list --porcelain | grep -q "^branch refs/heads/$b$" && continue
-  git -C "$MAINROOT" merge-base --is-ancestor "refs/heads/$b" "origin/$MAIN" 2>/dev/null || echo "$MERGED_SRC" | grep -qx "$b" || continue
+  if git -C "$MAINROOT" merge-base --is-ancestor "refs/heads/$b" "origin/$MAIN" 2>/dev/null; then
+    # a branch sitting exactly on origin/main has no work of its own: it was just created, it was not merged
+    [ "$(git -C "$MAINROOT" rev-parse "refs/heads/$b")" = "$(git -C "$MAINROOT" rev-parse "origin/$MAIN")" ] && { say "• branch $b has no commits yet — left alone"; continue; }
+  else
+    echo "$MERGED_SRC" | grep -qx "$b" || continue
+  fi
   [ "$DRY" = 1 ] && { say "▸ would delete merged local branch $b"; continue; }
   git -C "$MAINROOT" branch -D "$b" >/dev/null 2>&1 && say "✓ deleted merged local branch $b"
 done

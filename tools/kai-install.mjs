@@ -24,7 +24,7 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DST = path.join(os.homedir(), ".claude"), BASE = path.join(DST, ".kaicode", "base");
 const argv = process.argv.slice(2), DRY = argv.includes("--dry-run"), QUIET = argv.includes("--quiet");
 const only = argv.filter((a) => !a.startsWith("--"));
-const TRACK = /^(agents\/[^/]+\.md|commands\/.+|hooks\/[^/]+|tools\/[^/]+|templates\/[^/]+|statusline\.mjs)$/;
+const TRACK = /^(agents\/[^/]+\.md|commands\/.+|hooks\/[^/]+|tools\/.+|templates\/[^/]+|statusline\.mjs)$/;
 const isVariant = (p) => /^agents\/.+--(?:[a-z0-9]+-)?(low|medium|high|xhigh|max)\.md$/.test(p);
 const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
 const read = (f) => { try { return fs.readFileSync(f); } catch { return null; } };
@@ -40,12 +40,20 @@ if (only.length && !argv.includes("--adopt")) files = files.filter((p) => only.i
 
 // --status: what changed locally since the last install
 if (argv.includes("--status")) {
+  // Also mirrored into ~/.claude-work/.kaicode-review/ (git-ignored): status.diff plus the local and base copies of every
+  // changed file, so a reviewer without access to ~/.claude (a Cowork session) can read them.
+  const REV = path.join(REPO, ".kaicode-review"); for (const x of ["local", "base"]) fs.rmSync(path.join(REV, x), { recursive: true, force: true }); fs.mkdirSync(REV, { recursive: true });
+  const diffs = [];
   let n = 0;
   for (const p of files) { const d = read(path.join(DST, p)); if (d && fs.existsSync(path.join(DST, p) + ".kaicode-new")) console.log(`\n! ${p}: unresolved conflict — compare ${p} with ${p}.kaicode-new (merge attempt: ${p}.kaicode-conflict)`); }
   for (const p of files) { const b = read(path.join(BASE, p)) || read(path.join(REPO, p)), d = read(path.join(DST, p)); if (!b || !d || sha(b) === sha(d)) continue; n++;
     console.log(`\n● ${p} changed in ~/.claude (adopt it: node ~/.claude-work/tools/kai-install.mjs --adopt ${p})`);
-    try { execFileSync("diff", ["-u", path.join(BASE, p), path.join(DST, p)], { stdio: "inherit" }); } catch {} }
-  console.log(n ? `\n${n} file(s) with local changes` : "no local changes in ~/.claude"); process.exit(0);
+    let df = ""; try { execFileSync("diff", ["-u", path.join(BASE, p), path.join(DST, p)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch (e) { df = String(e.stdout || ""); }
+    if (!fs.existsSync(path.join(BASE, p))) { try { execFileSync("diff", ["-u", path.join(REPO, p), path.join(DST, p)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch (e) { df = String(e.stdout || ""); } }
+    process.stdout.write(df); diffs.push(`● ${p}\n${df}`);
+    for (const [dir, buf] of [["local", d], ["base", b]]) { const f = path.join(REV, dir, p); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, buf); } }
+  fs.writeFileSync(path.join(REV, "status.diff"), `${new Date().toISOString()}\n${diffs.join("\n")}\n${n} file(s) with local changes\n`);
+  console.log(n ? `\n${n} file(s) with local changes · copy for review: ~/.claude-work/.kaicode-review/` : "no local changes in ~/.claude"); process.exit(0);
 }
 // --adopt: local improvement → repo
 if (argv.includes("--adopt")) {

@@ -4,7 +4,7 @@ description: Refine tickets that already exist (an epic and its children, or one
 You are running **/plan**: the step between "the tickets exist" and "/ship". The tickets already say what is wanted, at a high level or in detail. Your job is to turn them into something /ship can execute without guessing: verified facts, decided or assigned questions, a contract, and per ticket testable acceptance and ordered steps. You change no code and create no tickets unless the user approves it. State: `node ~/.claude/tools/plan-state.mjs`. Every artefact is English; messages to people follow lead.md Voice and People.
 
 Conventions:
-- **Run it in the repo that owns the work**, main checkout (`git rev-parse --git-common-dir`); the spec goes to `openspec/changes/<slug>/` there, and `cc-link` makes it visible in every ticket worktree later.
+- **Run it from a ticket worktree**: the spec belongs in `openspec/changes/<slug>/` in the main checkout (`git rev-parse --git-common-dir`), linked into ticket worktrees by `cc-link`. Because `openspec/` is untracked and excluded via `.git/info/exclude`, `guard-branch` permits writing it through a ticket worktree, but denies writing it directly from the main checkout.
 - **Only STOPs are questions**: the facts a human must provide (gate-facts), decisions only the owning team can take, the spec approval (gate-human), and any Jira write beyond comments.
 - **Claims in a ticket are hypotheses until checked here.** "The helper exposes no continuation token", "no migration needed", "8 to 10 files" were written from a reading, possibly of another repo; verify each against this repo before the spec relies on it.
 

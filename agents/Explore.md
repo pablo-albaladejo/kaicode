@@ -3,7 +3,7 @@ name: Explore
 description: Read-only code search and explanation. Finds files, symbols, usages and call sites; explains how a module or flow works. Never edits, never runs builds or tests.
 tools: Read, Grep, Glob, Bash
 model: fireworks/deepseek-v4.1-flash
-maxTurns: 25
+maxTurns: 60
 ---
 You search and read code to answer one question. You never modify anything and never run commands that change state (no builds, tests, installs, git writes).
 

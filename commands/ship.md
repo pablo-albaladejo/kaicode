@@ -108,7 +108,7 @@ Gate: JSON parses; no finding with severity `Critical` or `Major`; sync-check ex
 `ship-state stage <T> stop-mr`.
 
 ## 7. stop-mr  (human)
-Build the MR text from `~/.claude/templates/mr.md`: title `<type>(<scope>): <summary> (<T>)`, body from plan/spec + `git log origin/main..HEAD --oneline` + `git diff --stat origin/main..HEAD` + minor findings as "Follow-ups". Then STOP and show: title, the body, `diff --stat`, `ship-state status` (cost). Options: "open it", "open as draft", "change: …", "abort". Wait.
+Build the MR text from `~/.claude/templates/mr.md`: title `<type>(<scope>): [<T>] <summary>` (the Jira key in brackets right after type/scope, matching commitlint's own format for the squashed commit — never `(<T>)` at the end, which fails a repo's `references-empty` check or just reads wrong), body from plan/spec + `git log origin/main..HEAD --oneline` + `git diff --stat origin/main..HEAD` + minor findings as "Follow-ups". Then STOP and show: title, the body, `diff --stat`, `ship-state status` (cost). Options: "open it", "open as draft", "change: …", "abort". Wait.
 
 ## 8. open-mr
 On "open": `git push -u origin <branch>` then `glab mr create --title "<title>" --description "$(cat .claude/ship/<T>/mr.md)" --source-branch <branch> --target-branch main [--draft] --remove-source-branch`. (The `ship-gates` hook allows both only with `verdicts.code = APPROVE`.)

@@ -81,6 +81,17 @@ if (/code-write\.mjs/.test(cmd) && !/--report/.test(cmd)) {
   }
 }
 if (/^\s*CC_CONFIRMED=1\s/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "confirmed", agent: input.agent_type || "main" }); process.exit(0); } // user said "run it"
+// tools/jira-qa-done.sh sets QA Sub-Status = Done (the automation then moves the ticket): a ticket decision, so its write
+// form needs the user's words and CC_CONFIRMED=1 (handled above). `--check` is read-only. It reads the token itself.
+{
+  const runs = cmd.split(/\n|&&|\|\||;|\|/).map((s) => s.match(/^\s*(?:\w+=\S*\s+)*(?:(?:ba|z)?sh\s+(?:-c\s+)?["']?)?\S*jira-qa-done\.sh\b(.*)$/)).filter(Boolean);
+  if (runs.some((m) => !/\s--check\b/.test(m[1]))) {
+    log({ command: cmd.slice(0, 300), verdict: "destructive", confidence: 1, reason: "jira-qa-done write without confirmation", agent: input.agent_type || "main" });
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny",
+      permissionDecisionReason: `bash-guard: jira-qa-done.sh without --check sets QA Sub-Status to Done and the automation moves the ticket to Ready For Production. Run it with --check first, show the user the result, and only after they say "run it" re-run it once prefixed with CC_CONFIRMED=1.` } }));
+    process.exit(0);
+  }
+}
 // --force-with-lease on a feature branch is how a rebased branch is pushed: a write, not a loss (the lease refuses to
 // overwrite what someone else pushed). Only main/master and a bare --force stay with the classifier.
 if (/\bgit\s+push\b[^|;&]*--force-with-lease/.test(cmd) && !/\bgit\s+push\b[^|;&]*(\s--force(\s|$)|\s-f(\s|$))/.test(cmd) && !/\b(main|master)\b/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "write", confidence: 1, reason: "force-with-lease on a feature branch", agent: input.agent_type || "main" }); process.exit(0); }

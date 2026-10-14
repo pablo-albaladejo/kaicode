@@ -1,0 +1,54 @@
+#!/usr/bin/env node
+// kai-runner: lets a reviewer that cannot reach ~/.claude (a Cowork session, which only sees ~/.claude-work) run a
+// FIXED list of harness commands on this Mac, without copy and paste. It is not a shell: every request is checked
+// against the allowlist below and run with execFile (no shell, no free text).
+//   queue:   ~/.claude-work/.kaicode-queue/<id>.json   {"cmd": "status", "args": []}
+//   output:  ~/.claude-work/.kaicode-review/out/<id>.txt   (+ status.diff and local/base copies, refreshed every run)
+// Run by launchd (apply-runner.sh) when the queue folder changes and every 10 minutes. Log: ~/.claude/logs/kai-runner.log
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const Q = path.join(REPO, ".kaicode-queue"), OUT = path.join(REPO, ".kaicode-review", "out");
+const CL = path.join(os.homedir(), ".claude"), LOG = path.join(CL, "logs", "kai-runner.log");
+const NODE = process.execPath, KAI = path.join(REPO, "tools", "kai-install.mjs");
+const SAFE_PATH = /^(agents|commands|hooks|tools|templates)\/[A-Za-z0-9._\/-]+$|^statusline\.mjs$/;
+const LOGS = { sweep: "sweep.log", runner: "kai-runner.log", router: "model-router.jsonl", guards: "guards.jsonl" };
+const paths = (a) => { const bad = a.filter((p) => !SAFE_PATH.test(p) || p.includes("..")); if (bad.length) throw new Error(`not a harness path: ${bad.join(" ")}`); if (!a.length) throw new Error("give at least one path"); return a; };
+
+// cmd → [file, argv] ; everything here is read-only or a kai-install action (3-way merge, never an overwrite)
+const ALLOW = {
+  "status":     () => [NODE, [KAI, "--status"]],
+  "dry-run":    (a) => [NODE, [KAI, "--dry-run", ...(a.length ? paths(a) : [])]],
+  "install":    (a) => [NODE, [KAI, ...paths(a)]],
+  "adopt":      (a) => [NODE, [KAI, "--adopt", ...paths(a)]],
+  "cost":       (a) => [NODE, [path.join(CL, "tools", "cc-cost.mjs"), "--days", String(Math.min(30, Math.max(1, parseInt(a[0] || "1", 10) || 1)))]],
+  "log":        (a) => { const f = LOGS[a[0]]; if (!f) throw new Error(`log one of: ${Object.keys(LOGS).join(" ")}`); return ["tail", ["-n", String(Math.min(400, parseInt(a[1] || "80", 10) || 80)), path.join(CL, "logs", f)]]; },
+  "ls":         (a) => { const d = a[0] || "."; if (!/^(agents|commands|hooks|tools|templates|knowledge|logs|\.kaicode)(\/[A-Za-z0-9._-]+)*$|^\.$/.test(d)) throw new Error("ls a harness folder"); return ["ls", ["-la", path.join(CL, d)]]; },
+  "settings":   () => [NODE, ["-e", `const s=JSON.parse(require("fs").readFileSync(${JSON.stringify(path.join(CL, "settings.json"))},"utf8"));for(const k of Object.keys(s.env||{}))if(/KEY|TOKEN|SECRET|PASS/i.test(k))s.env[k]="<hidden>";delete s.apiKeyHelper;console.log(JSON.stringify(s,null,2))`]],
+  "router":     () => ["cat", [path.join(CL, "router.json")]],
+};
+
+const log = (m) => { try { fs.mkdirSync(path.dirname(LOG), { recursive: true }); fs.appendFileSync(LOG, `${new Date().toISOString()} ${m}\n`); } catch {} };
+fs.mkdirSync(Q, { recursive: true }); fs.mkdirSync(OUT, { recursive: true });
+const run = (file, argv) => { try { return { code: 0, out: execFileSync(file, argv, { encoding: "utf8", timeout: 120000, maxBuffer: 32 << 20, stdio: ["ignore", "pipe", "pipe"] }) }; } catch (e) { return { code: e.status ?? 1, out: `${e.stdout || ""}${e.stderr || ""}${e.message && !e.stdout ? e.message : ""}` }; } };
+
+let did = 0;
+for (const f of fs.readdirSync(Q).filter((x) => /^[A-Za-z0-9_-]+\.json$/.test(x)).sort()) {
+  const id = f.slice(0, -5), qf = path.join(Q, f); let req, res;
+  try { req = JSON.parse(fs.readFileSync(qf, "utf8")); } catch { req = {}; }
+  fs.rmSync(qf, { force: true });
+  try {
+    const mk = ALLOW[req.cmd]; if (!mk) throw new Error(`unknown cmd "${req.cmd}"; allowed: ${Object.keys(ALLOW).join(" ")}`);
+    const args = Array.isArray(req.args) ? req.args.map(String) : [];
+    const [file, argv] = mk(args); res = run(file, argv);
+  } catch (e) { res = { code: 2, out: `refused: ${e.message}\n` }; }
+  fs.writeFileSync(path.join(OUT, `${id}.txt`), `$ ${req.cmd} ${(req.args || []).join(" ")}\nexit ${res.code} · ${new Date().toISOString()}\n\n${res.out}`);
+  log(`${id} ${req.cmd} ${(req.args || []).join(" ")} → exit ${res.code}`); did++;
+}
+// always leave a fresh status for the reviewer
+run(NODE, [KAI, "--status"]);
+fs.writeFileSync(path.join(REPO, ".kaicode-review", "heartbeat"), `${new Date().toISOString()} ran ${did} request(s)\n`);
