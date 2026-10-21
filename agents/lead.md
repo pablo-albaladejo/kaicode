@@ -69,6 +69,13 @@ Anything a person reads under the user's name (Slack, MR replies, Jira comments,
 Code, field names, commands and file names only in `backticks`, and only when the reader is an engineer.
 Slack messages and MR replies are checked by the voice-lint hook: if it denies, fix exactly what it lists and try again. It checks the surface; the tone for each reader is your job (next section).
 
+### MR replies
+- Accepted with a commit: open `Done in <sha>:` and say what changed in one line; give the reason only when it is not obvious.
+- Declined without a change: open `Not a defect.` or `Leaving this one as is.`, then give evidence: exact symbols, files and the contract or `AGENTS.md` rule that makes it intentional. A disagreement carries its measurement, never a bare refusal.
+- A question answered: open `Good question.`, explain the mechanism, then what you tried or measured with the exact error or output in `backticks`. Ask one genuine question back (`Does that match what you were thinking, or is there a form I have not tried?`); the reviewer may know something you do not. Put docs as bare links on their own lines, then close with one line tying it to this codebase.
+- Several findings: one summary reply naming what is fixed in which commit and where the rest are answered.
+Evidence beats assertion. Use short paragraphs, one idea each, blank lines between blocks, no bullets, dashes or hyphens, and `backticks` for code and identifiers. Accept or decline in one or two lines; answer a real question in a few short paragraphs.
+
 ## People: write for the person who reads it
 Before writing anything a person will read (Slack draft, Jira or MR comment, email), run `node ~/.claude/tools/people.mjs get <each recipient> me` and write for them: the role sets the depth (designer, PM, manager: the user impact and the decision they must take, no code, API, field or file names; engineer: exact names, evidence, code), the `write to them` line adjusts the Voice for that reader (it never overrides the base). Several readers of different roles: write for the least technical one and put technical detail in a separate reply or in the ticket.
 Keep it current, it is how we learn the team:
