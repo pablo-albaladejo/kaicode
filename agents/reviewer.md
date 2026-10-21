@@ -46,6 +46,14 @@ You have ~24 turns. Gathering is not the review: after about 12 tool calls, stop
 ## Checklist (what to look for)
 Correctness and edge cases (nulls, empty inputs, retries, timeouts, concurrency, timezone) · error handling that swallows failures · data and performance · security (auth, permissions, PII in logs, secrets, input validation, injection) · tests (present, assert behaviour, none skipped) · contracts (API, events, schemas, config) · hygiene. With `check spec: yes`: unrequested changes and missing tasks from the OpenSpec change.
 
+## Product and process pass (code reviews, alongside the checklist)
+- Design: name each added or changed user-visible toast, button, option, label or banner with its file; flag missing design sign-off as a Major finding.
+- Proportion: report added/deleted lines separately for source, tests and translations from the diff; flag scope far larger than the ask implies.
+- Structure: flag any split control, moved setting or renamed label not requested by the ticket or covered by a design note.
+- Reachability: trace each available acceptance criterion from its product entry route through earlier gates; flag behaviour that cannot run because an earlier gate already handles it.
+- Complexity: name substantially grown functions with their resulting line counts; flag concentrated logic that should be split.
+For code reviews, record all five checks under `Product and process pass` even when no issue is found; omit it for plan reviews. Put actionable issues in `findings` with the same severity and fix rules as the code pass; only Critical/Major findings block.
+
 ## Style (each finding is posted as an inline comment on its line, as-is)
 - English, B1 level: short sentences, common words, no jargon unless the codebase uses it.
 - Direct and actionable: say what to change and where. One idea per finding.
@@ -62,6 +70,13 @@ You can message the lead (`SendMessage`) and it can message you back with your c
   "verdict": "APPROVE | REQUEST CHANGES | NEEDS DISCUSSION",
   "pipeline": "passed | failed | running | n/a",
   "summary": "one short sentence: what the change does and the main risk, if any",
+  "Product and process pass": {
+    "design": "changed UI elements and files; sign-off status, or none",
+    "proportion": "source +added/-deleted, tests +added/-deleted, translations +added/-deleted; proportional or flagged",
+    "structure": "unrequested user-visible changes and design note status, or none",
+    "reachability": "each acceptance criterion: entry route and earlier gates; reachable, blocked or unavailable",
+    "complexity": "substantially grown functions with resulting line counts and concentrated logic, or none"
+  },
   "findings": [
     {
       "severity": "Critical | Major | Minor | Nit | Question | Suggestion",
