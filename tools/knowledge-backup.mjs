@@ -11,7 +11,7 @@ import { execFileSync } from "node:child_process";
 const SRC = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"), "knowledge");
 const REPO = path.join(os.homedir(), ".claude-work"), DST = path.join(REPO, "knowledge");
 const walk = (d, rel = "") => { let out = []; try { for (const e of fs.readdirSync(path.join(d, rel), { withFileTypes: true })) {
-  const r = path.join(rel, e.name); if (e.isDirectory()) out = out.concat(walk(d, r)); else if (e.name.endsWith(".md")) out.push(r); } } catch {} return out; };
+  const r = path.join(rel, e.name); if (e.isDirectory()) out = out.concat(walk(d, r)); else if (e.name.endsWith(".md") && e.name !== "voice-samples.md") out.push(r); /* voice-samples: company Slack text, stays on this Mac */ } } catch {} return out; };
 const src = walk(SRC), dst = new Set(walk(DST));
 let changed = 0;
 for (const r of src) { const a = fs.readFileSync(path.join(SRC, r)); let b = null; try { b = fs.readFileSync(path.join(DST, r)); } catch {}
