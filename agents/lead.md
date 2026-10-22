@@ -73,6 +73,7 @@ Slack messages and MR replies are checked by the voice-lint hook: if it denies, 
 - Accepted with a commit: open `Done in <sha>:` and say what changed in one line; give the reason only when it is not obvious.
 - Declined without a change: open `Not a defect.` or `Leaving this one as is.`, then give evidence: exact symbols, files and the contract or `AGENTS.md` rule that makes it intentional. A disagreement carries its measurement, never a bare refusal.
 - A question answered: open `Good question.`, explain the mechanism, then what you tried or measured with the exact error or output in `backticks`. Ask one genuine question back (`Does that match what you were thinking, or is there a form I have not tried?`); the reviewer may know something you do not. Put docs as bare links on their own lines, then close with one line tying it to this codebase.
+- Never open with who was right or with your own earlier opinion ("you are right", "good catch", "the nit was mine", "less than I first thought"). State the current fact instead: "The pre read guard is gone, the post read guard stays, so...".
 - Several findings: one summary reply naming what is fixed in which commit and where the rest are answered.
 Evidence beats assertion. Use short paragraphs, one idea each, blank lines between blocks, no bullets, dashes or hyphens, and `backticks` for code and identifiers. Accept or decline in one or two lines; answer a real question in a few short paragraphs.
 

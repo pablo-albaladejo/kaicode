@@ -21,13 +21,13 @@ if (!plan) { console.error("no plan.md and no spec section: run the plan stage f
 
 // steps: numbered items (1. / - [ ] 1.) with their continuation lines
 const steps = []; let cur = null;
-for (const line of plan.split("\n")) {
-  const m = line.match(/^\s*(?:[-*]\s*\[[ x]\]\s*)?(\d+)[.)]\s+(.*)$/);
-  if (m) { cur = { n: Number(m[1]), text: line.trim() }; steps.push(cur); continue; }
+for (const line of (plan.split(/^###\s*Steps\s*$/m)[1] || plan).split(/^###\s/m)[0].split("\n")) {
+  const m = line.match(/^\s*(?:[-*]\s*\[[ x]\]\s*)?(\d+(?:\.\d+)*)[.)]?\s+(.*)$/);
+  if (m) { cur = { n: m[1], text: line.trim() }; steps.push(cur); continue; }
   if (cur && /^\s{2,}\S/.test(line)) cur.text += "\n   " + line.trim(); else if (!line.trim()) cur = null;
 }
 const si = argv.indexOf("--step"), want = si >= 0 ? Number(argv[si + 1]) : null;
-const pick = argv.includes("--all") || want == null ? steps : steps.filter((x) => x.n === want);
+const pick = argv.includes("--all") || want == null ? steps : steps.filter((x) => String(x.n) === String(want) || String(x.n).startsWith(String(want) + "."));
 if (want != null && !pick.length) { console.error(`step ${want} not found; steps: ${steps.map((x) => x.n).join(", ")}`); process.exit(1); }
 const goal = (plan.match(/^Goal:\s*(.+)$/m) || [])[1] || "";
 const acceptance = (s.acceptance || []).length ? s.acceptance.map((a, i) => `${i + 1}. ${typeof a === "string" ? a : a.text || JSON.stringify(a)}`).join("\n") : (read(path.join(dir, "brief.md")).match(/Acceptance[^\n]*\n([\s\S]*?)(\n#|\n\n[A-Z])/i) || [])[1]?.trim() || "(see the plan)";

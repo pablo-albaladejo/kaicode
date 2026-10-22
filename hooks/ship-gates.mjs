@@ -55,13 +55,17 @@ if (d.hook_event_name === "SubagentStop") {
   // Facts checked from the repo and the transcript, not from the report (retro 2026-10-14: "done" for code nobody
   // called, "passed 43" that were files, --no-verify commits).
   const passed = tests ? Number((tests.match(/passed\s+(\d+)/i) || [])[1] ?? NaN) : NaN;
+  // The suite a step runs is the command in its own Tests line (before the →), so counts are compared per command.
+  const cmdKey = ((tests && tests.includes("→") ? tests.split("→")[0] : "").replace(/^\s*Tests:\s*/i, "").replace(/\s+/g, " ").trim()) || null;
   const facts = [];
   if (status === "done") {
     let cmds = [];
     if (d.agent_transcript_path) { try { for (const l of fs.readFileSync(d.agent_transcript_path, "utf8").split("\n")) { try { const e = JSON.parse(l); for (const b of e.message?.content || []) if (b.type === "tool_use" && b.name === "Bash") cmds.push(String(b.input?.command || "")); } catch {} } } catch {} }
     if (cmds.some((c) => /\bgit\b[^|;&]*\bcommit\b[^|;&]*--no-verify|HUSKY=0|SKIP_HOOKS=1/.test(c))) facts.push("you committed with --no-verify (or hooks disabled). Undo that commit (git reset --soft HEAD~1), make the pre-commit checks pass, and commit again without skipping hooks");
     const prev = Number(st.s.tests_max || 0);
-    if (!Number.isNaN(passed) && prev && passed < prev) facts.push(`Tests says passed ${passed}, but an earlier run on this ticket passed ${prev}. Count TESTS, not test files (vitest: the "Tests  N passed" line), and run the same suite`);
+    const byCmd = st.s.tests_max_by_cmd && typeof st.s.tests_max_by_cmd === "object" ? st.s.tests_max_by_cmd : {};
+    const prevCmd = cmdKey ? Number(byCmd[cmdKey]?.passed || 0) : prev;
+    if (!Number.isNaN(passed) && prevCmd && passed < prevCmd) facts.push(`Tests says passed ${passed}, but an earlier run ${cmdKey ? "of the same command" : "on this ticket"} passed ${prevCmd}. Count TESTS, not test files (vitest: the "Tests  N passed" line), and run the same suite`);
     const base = git("merge-base origin/main HEAD", cwd) || git("merge-base origin/master HEAD", cwd);
     if (base) {
       const changed = git(`diff --name-only ${base}`, cwd).split("\n").filter(Boolean);
@@ -81,7 +85,13 @@ if (d.hook_event_name === "SubagentStop") {
       if (unwired.length) facts.push(`new exports that nothing outside their file and tests uses: ${unwired.slice(0, 6).join(", ")}. Wire them where the plan says (wire:), or if that is a later step say so in Notes as "unwired: <name> — step <n>"`);
     }
   }
-  if (!Number.isNaN(passed) && passed > Number(st.s.tests_max || 0) && failed === 0) st.s.tests_max = passed;
+  if (!Number.isNaN(passed) && failed === 0) {
+    if (cmdKey) {
+      const byCmd = st.s.tests_max_by_cmd && typeof st.s.tests_max_by_cmd === "object" ? st.s.tests_max_by_cmd : {};
+      if (passed > Number(byCmd[cmdKey]?.passed || 0)) { byCmd[cmdKey] = { passed, cmd: cmdKey, ts: new Date().toISOString() }; st.s.tests_max_by_cmd = byCmd; }
+    }
+    if (passed > Number(st.s.tests_max || 0)) st.s.tests_max = passed;
+  }
   const ok = status === "done" && failed === 0 && lintClean && !facts.length;
   const already = !!d.stop_hook_active || (st.s.implement_result?.blocked_once === true);
   st.s.implement_result = { ts: new Date().toISOString(), agent: d.agent_type, status, tests, failed: Number.isNaN(failed) ? null : failed, lint_clean: lintClean, facts, ok, blocked_once: already };

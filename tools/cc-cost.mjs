@@ -159,7 +159,7 @@ function parseAgent(file, agentName) {
         if (b.type === "thinking" && c) c.thinkingChars += (b.thinking || "").length;
         if (b.type !== "tool_use") continue;
         if (c) c.toolsCalled.push(b.name);
-        if (b.name === "Task" || b.name === "Agent") { const type = baseAgent(b.input?.subagent_type || "general-purpose"); agentLaunches.push({ type, desc: b.input?.description || "", t: e.timestamp, callIdx: calls.length - 1 }); pending.set(b.id, { name: "Agent", detail: type }); continue; }
+        if (b.name === "Task" || b.name === "Agent") { const type = baseAgent(b.input?.subagent_type || "general-purpose"); agentLaunches.push({ type, desc: b.input?.description || "", toolUseId: b.id, t: e.timestamp, callIdx: calls.length - 1 }); pending.set(b.id, { name: "Agent", detail: type }); continue; }
         if (b.name === "Skill") { const s = { name: b.input?.skill || b.input?.name || "?", t: e.timestamp, tok: 0 }; skills.push(s); pending.set(b.id, { set tok(v) { s.tok = v; }, set error(v) {}, name: "Skill", detail: s.name }); continue; }
         const t = { name: b.name.replace(/^mcp__/, "mcp:").replace(/__/g, ":"), detail: detailOf(b.name, b.input), t: e.timestamp, tok: 0, callIdx: calls.length - 1, agent: agentName };
         tools.push(t); pending.set(b.id, t);
@@ -191,17 +191,18 @@ function subagentFiles(sessionId, mainFile) {
   try { for (const f of fs.readdirSync(dir)) if (f.endsWith(".jsonl")) files.add(path.join(dir, f)); } catch {}
   return [...files].filter((f) => fs.existsSync(f)).map((f) => {
     const id = path.basename(f, ".jsonl").replace(/^agent-/, "");
-    let type = types.get(f) || types.get(id);
-    if (!type) { try { const meta = JSON.parse(fs.readFileSync(f.replace(/\.jsonl$/, ".meta.json"), "utf8")); type = meta.agentType || meta.agent_type; } catch {} }
+    let type = types.get(f) || types.get(id), meta = {};
+    try { meta = JSON.parse(fs.readFileSync(f.replace(/\.jsonl$/, ".meta.json"), "utf8")); } catch {}
+    if (!type) type = meta.agentType || meta.agent_type;
     type = baseAgent(type);
-    return { file: f, type: (type || "subagent").replace(/^aircall-aircode-agents:/, "aircode:"), id };
+    return { file: f, type: (type || "subagent").replace(/^aircall-aircode-agents:/, "aircode:"), id, desc: meta.description || "", toolUseId: meta.toolUseId || null };
   });
 }
 
 function analyzeSession(file) {
   const sessionId = path.basename(file, ".jsonl");
   const main = parseAgent(file, "main");
-  const subs = subagentFiles(sessionId, file).map((s) => ({ ...parseAgent(s.file, s.type), id: s.id }));
+  const subs = subagentFiles(sessionId, file).map((s) => ({ ...parseAgent(s.file, s.type), id: s.id, desc: s.desc, toolUseId: s.toolUseId }));
   // bulk-read calls (tools/bulk-read.mjs, logged in logs/read-shunt.jsonl) made from this session's folder while it ran
   { const mt = main.calls.map((c) => new Date(c.t).getTime()).filter(Boolean);
     if (mt.length) { const t0 = Math.min(...mt) - 60000, t1 = Math.max(...mt) + 600000;
@@ -461,11 +462,28 @@ function resolveSession(s) {
 if (opt("--ticket")) {
   // Spend attributed to one ticket = every session that ran in its worktree or on its branch (one ticket = one worktree).
   const T = String(opt("--ticket")); const days = Number(opt("--days") || 30);
-  const rs = listSessions(true, Date.now() - days * 86400000).map(analyzeSession).filter((r) => r.calls.length)
-    .filter((r) => (r.branch || "").includes(T) || r.project === T || (r.main.cwd || "").split(path.sep).includes(T) || r.subs.some((a) => (a.agentLaunches || []).some((l) => l.desc.includes(T))) || r.main.agentLaunches.some((l) => l.desc.includes(T)));
-  const cost = rs.reduce((a, r) => a + r.tot.cost, 0), calls = rs.reduce((a, r) => a + r.tot.calls, 0);
-  if (JSON_OUT) console.log(JSON.stringify({ ticket: T, days, sessions: rs.length, calls, cost, usd: rs.every((r) => r.usd), by_session: rs.map((r) => ({ session: r.sessionId, branch: r.branch, start: new Date(r.start).toISOString(), cost: r.tot.cost })) }, null, 2));
-  else console.log(`${T}: ${money(cost, rs.every((r) => r.usd))} over ${rs.length} session(s), ${calls} calls, last ${days} days`);
+  // A session that only launched subagents for T (a coordinator on main) contributes those subagents and their descendants, not its own turns.
+  const ticketSubs = (r) => {
+    const launchDesc = new Map(), parentOf = new Map();
+    for (const l of r.main.agentLaunches) if (l.toolUseId) launchDesc.set(l.toolUseId, l.desc);
+    for (const a of r.subs) for (const l of a.agentLaunches || []) if (l.toolUseId) { launchDesc.set(l.toolUseId, l.desc); parentOf.set(l.toolUseId, a); }
+    const hit = (a, seen = new Set()) => {
+      if (!a || seen.has(a)) return false; seen.add(a);
+      if ((a.desc || launchDesc.get(a.toolUseId) || "").includes(T)) return true;
+      return hit(parentOf.get(a.toolUseId), seen);
+    };
+    return r.subs.filter((a) => a.toolUseId && hit(a));
+  };
+  const rs = listSessions(true, Date.now() - days * 86400000).map(analyzeSession).filter((r) => r.calls.length).map((r) => {
+    if ((r.branch || "").includes(T) || r.project === T || (r.main.cwd || "").split(path.sep).includes(T))
+      return { r, scope: "session", cost: r.tot.cost, calls: r.tot.calls, start: r.start };
+    const subs = ticketSubs(r); if (!subs.length) return null;
+    const cs = subs.flatMap((a) => a.calls);
+    return { r, scope: "subagents", subagents: subs.length, cost: cs.reduce((x, c) => x + c.cost, 0), calls: cs.length, start: Math.min(...cs.map((c) => new Date(c.t).getTime()).filter(Boolean)) };
+  }).filter(Boolean);
+  const cost = rs.reduce((a, x) => a + x.cost, 0), calls = rs.reduce((a, x) => a + x.calls, 0);
+  if (JSON_OUT) console.log(JSON.stringify({ ticket: T, days, sessions: rs.length, calls, cost, usd: rs.every((x) => x.r.usd), by_session: rs.map((x) => ({ session: x.r.sessionId, branch: x.r.branch, start: new Date(Number.isFinite(x.start) ? x.start : x.r.start).toISOString(), scope: x.scope, ...(x.subagents ? { subagents: x.subagents } : {}), calls: x.calls, cost: x.cost })) }, null, 2));
+  else console.log(`${T}: ${money(cost, rs.every((x) => x.r.usd))} over ${rs.length} session(s), ${calls} calls, last ${days} days`);
 } else if (opt("--days")) {
   const days = Number(opt("--days"));
   if (JSON_OUT) {

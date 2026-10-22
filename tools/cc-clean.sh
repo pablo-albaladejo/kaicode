@@ -26,6 +26,11 @@ echo "▸ $T: branch $BR${WT:+ · worktree $WT}"
 if [ -n "$WT" ] && [ -n "$(git -C "$WT" status --porcelain)" ]; then echo "✗ $WT has uncommitted changes — commit, stash or discard first"; exit 1; fi
 # merged? MR state first, then content (squash merges are not ancestors)
 MERGED=0; MR=""; SHA="$(git -C "$MAINROOT" rev-parse "$BR")"
+if command -v glab >/dev/null; then
+  if OPEN_MR="$(cd "$MAINROOT" && glab mr list --source-branch "$BR" --output json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s||"[]")[0];if(m)console.log("!"+m.iid)})' 2>/dev/null)"; then
+    [ -n "$OPEN_MR" ] && { echo "✗ $BR has an open MR ($OPEN_MR) — it is not merged; nothing removed"; exit 1; }
+  fi
+fi
 if command -v glab >/dev/null; then MR="$(cd "$MAINROOT" && glab mr list --merged --source-branch "$BR" --output json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s||"[]")[0];if(m)console.log("!"+m.iid+" "+m.merge_commit_sha)})' 2>/dev/null)"; [ -n "$MR" ] && MERGED=1; fi
 if git -C "$MAINROOT" merge-base --is-ancestor "$SHA" "origin/$MAIN"; then MERGED=1; fi
 if [ "$MERGED" = 0 ] && [ -z "$(git -C "$MAINROOT" diff --stat "origin/$MAIN" "$SHA" -- $(git -C "$MAINROOT" diff --name-only "origin/$MAIN...$SHA" 2>/dev/null) 2>/dev/null)" ]; then MERGED=1; fi
