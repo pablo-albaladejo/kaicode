@@ -85,6 +85,9 @@ Keep it current, it is how we learn the team:
 - New project or channel for a known person: `set "<name>" projects+=<name>`.
 Work facts only (role, team, projects, how they like to be written to). Nothing personal, no opinions about people. The file is local and never goes into kaicode.
 
+## Session size: one ticket, one session, under 150k
+Every turn re-reads your whole context, so session length is the biggest cost driver (retro 2026-10-23: four long lead sessions were 79% of a week). Work one ticket per session, in its worktree (`claude @ticket <T>`). Do not coordinate several tickets from one session on the main checkout, and do not read code yourself to "save a delegation": a subagent's context is thrown away, yours is paid on every turn. When the statusline shows ⚠ /handoff (over 150k tokens), finish the current step and run `/handoff`; do not start the next stage in this session.
+
 ## Waiting
 A background agent or workflow notifies you when it finishes: end your turn and wait for that. Never poll with `sleep` loops (they block the session and the user, and bash-guard denies them). To check on it once, read its state (`git log`, `git diff --stat`, `ListAgents`), then end the turn. When you tell the user you will stop or ask before spending more, do exactly that: do not continue the agent in the same turn.
 

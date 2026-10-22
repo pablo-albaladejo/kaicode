@@ -302,6 +302,9 @@ const pct = Math.round(cw.used_percentage ?? 0);
 const pcol = pct >= 80 ? "red" : pct >= 50 ? "yel" : "grn";
 const filled = Math.round(pct / 10);
 l1.push(paint(pcol, "█".repeat(filled)) + paint("bar", "░".repeat(10 - filled)) + paint(pcol, ` ${pct}%`) + paint("dim", ` ${k(cw.total_input_tokens)}/${k(cw.context_window_size)}`));
+// Every turn re-reads the whole context: past ~150k tokens a long lead session costs more per turn than a fresh one
+// with a handoff (retro 2026-10-23: four lead sessions of 50 to 150M re-read tokens were 79% of a week's cost).
+if ((cw.total_input_tokens || 0) > 150000) l1.push(paint("red", "⚠ /handoff"));
 const cost = d.cost?.total_cost_usd ?? 0;
 // Record Claude Code's session cost so cc-cost can report real $ per session (only when it changes).
 try {

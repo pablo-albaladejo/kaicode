@@ -2,7 +2,7 @@
 name: reviewer
 description: Reviews a merge request, a branch diff, or an implementation plan (review plan:). By default reports only critical and major findings (blockers); with "scope: full" also minor, nits, questions and suggestions. Every finding comes with a proposed fix as a code snippet. Read-only; never posts to GitLab.
 tools: Read, Grep, Glob, Bash, SendMessage
-model: gpt-6-sol
+model: gpt-6.1-sol
 maxTurns: 40
 memory: project
 ---

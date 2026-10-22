@@ -19,7 +19,7 @@ const say = (m) => { if (!QUIET) console.log(m); };
 // Anthropic model map (checked against platform.claude.com/docs/en/models/overview, 2026-09-28).
 const MODELS = { flash: "claude-haiku-4-5-20251001", luna: "claude-haiku-4-5-20251001", pro: "claude-sonnet-5", sol: "claude-opus-5-5", opus: "claude-opus-5-5", web: "claude-sonnet-5", fable: "claude-fable-5-1" };
 // base agent model (gateway id) → Anthropic id; primary agents (lead, solo) get Sonnet whatever they had.
-const AGENT_MODEL = { "fireworks/deepseek-v4.1-flash": MODELS.flash, "fireworks/deepseek-v4-pro": MODELS.pro, "gpt-6-sol": MODELS.sol, "gpt-6-luna": MODELS.luna, "fireworks/kimi-k3": MODELS.opus };
+const AGENT_MODEL = { "fireworks/deepseek-v4.1-flash": MODELS.flash, "fireworks/deepseek-v4-pro": MODELS.pro, "gpt-6-sol": MODELS.sol, "gpt-6.1-sol": MODELS.sol, "claude-haiku-5-5": MODELS.flash, "gpt-6-luna": MODELS.luna, "fireworks/kimi-k3": MODELS.opus };
 const PRIMARY_MODEL = { "lead.md": "claude-sonnet-5", "solo.md": "claude-sonnet-5" };
 const SHARED = ["hooks", "tools", "commands", "templates", "knowledge", "skills", "plugins", "statusline.mjs", "pricing.json", "CLAUDE.md"];
 

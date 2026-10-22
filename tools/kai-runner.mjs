@@ -34,6 +34,7 @@ const ALLOW = {
   "jira-get":   (a) => { if (!/^[A-Z][A-Z0-9]+-\d+$/.test(a[0] || "")) throw new Error("jira-get <KEY>"); return [NODE, [path.join(REPO, "tools", "jira-api.mjs"), "get", a[0]]]; },
   "gateway-models": () => [NODE, [path.join(REPO, "tools", "gateway-models.mjs"), "--out", path.join(REPO, ".kaicode-review", "gateway-models.json")]],
   "pricing-sync": () => [NODE, [path.join(REPO, "tools", "pricing-sync.mjs"), path.join(REPO, ".kaicode-review", "gateway-models.json")]],
+  "model-probe": (a) => { const ms = a.filter((m) => /^[\w./:-]+$/.test(m) || /^--effort=(low|medium|high|xhigh|max)$/.test(m)).slice(0, 9); if (!ms.length) throw new Error("model-probe <model>…"); return [NODE, [path.join(REPO, "tools", "model-probe.mjs"), ...ms]]; },
   "pricing":    () => ["cat", [path.join(CL, "pricing.json")]],
   "scrub-logs": () => [NODE, [path.join(REPO, "tools", "log-scrub.mjs"), path.join(CL, "logs")]],
   "retro":      (a) => [NODE, [path.join(CL, "tools", "retro-report.mjs"), "--days", String(Math.min(60, Math.max(1, parseInt(a[0] || "7", 10) || 7)))]],

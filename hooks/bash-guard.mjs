@@ -60,7 +60,13 @@ if (/code-write\.mjs/.test(cmd) && !/--report/.test(cmd)) {
     /\baws-vault\s+exec\b[^|;&]*--\s*env\b/,                                                      // dumps AWS keys
   ];
   const masked = /\|\s*(wc\b|shasum|sha\d+sum|md5|cut\s+-c\s*1-([1-9]|1[0-2])\b|head\s+-c\s*([1-9]|1[0-2])\b|jq\s+(-r\s+)?'?(keys|length))/;
-  const hit = cmd.split(/\n|&&|\|\||;/).map((x) => x.trim()).find((seg) => seg && !/^\w+=\$\(/.test(seg) && !/^(export\s+)?\w+=\S*\$\(/.test(seg) && readers.some((r) => r.test(seg)) && !masked.test(seg));
+  // A command substitution used as an argument ($(security … -w) inside curl -u, VAR=$(jq …)) hands the value to the
+  // program without printing it, so it is replaced by a placeholder before the check, unless echo/printf prints it.
+  // `export $(cat .env | xargs)` loads variables into the shell and prints nothing (retro 2026-10-23 false positives).
+  let flat = cmd;
+  for (let i = 0; i < 5; i++) flat = flat.replace(/(echo|printf)?([^$]*?)\$\(([^()]*)\)/g, (m, pr, mid, body) => pr && !/[|;&]/.test(mid) ? m.replace(`$(${body})`, `\u0000(${body})`) : `${pr || ""}${mid}$SUB`);
+  flat = flat.replace(/\u0000/g, "$");
+  const hit = flat.split(/\n|&&|\|\||;/).map((x) => x.trim()).find((seg) => seg && !/^\w+=\$\(/.test(seg) && !/^(export\s+)?\w+=\S*\$\(/.test(seg) && !/^export\s+\$SUB/.test(seg) && readers.some((r) => r.test(seg)) && !masked.test(seg));
   if (hit) {
     log({ command: cmd.slice(0, 120), verdict: "destructive", confidence: 1, reason: "would print a secret", agent: input.agent_type || "main" });
     process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny",
@@ -81,7 +87,8 @@ if (/code-write\.mjs/.test(cmd) && !/--report/.test(cmd)) {
     process.exit(0);
   }
 }
-if (/^\s*CC_CONFIRMED=1\s/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "confirmed", agent: input.agent_type || "main" }); process.exit(0); } // user said "run it"
+// "run it": CC_CONFIRMED=1 at the start of the command or of a segment after cd … && (agents run from a worktree)
+if (/^\s*CC_CONFIRMED=1\s/.test(cmd) || /^\s*cd\s+("[^"]*"|'[^']*'|\S+)\s*&&\s*CC_CONFIRMED=1\s/.test(cmd)) { log({ command: cmd.slice(0, 300), verdict: "confirmed", agent: input.agent_type || "main" }); process.exit(0); } // user said "run it"
 // tools/jira-api.mjs create makes a Jira ticket under the user's name: the user approves the shown draft first.
 if (/jira-api\.mjs["']?\s+create\b/.test(cmd) && !/--dry-run\b/.test(cmd)) {
   log({ command: cmd.slice(0, 300), verdict: "destructive", confidence: 1, reason: "jira create without confirmation", agent: input.agent_type || "main" });

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // router-set <key> <json>: changes ONE tuning value in ~/.claude/router.json (backup first: router.json.bak-<ts>).
-// Allowed keys only: useCases.<case>.levels.<low|medium|high> = ["<alias>","<effort>"], shipBudgetUsd, jevTimeoutMs,
+// Allowed keys only: useCases.<case>.levels.<low|medium|high> = ["<alias>","<effort>"], models.<alias> = "<model id>", shipBudgetUsd, jevTimeoutMs,
 // shipBudgetBySize = {"S":n,"M":n,"L":n}. Anything else is refused. Used by kai-runner so a reviewer can tune routing.
 import fs from "node:fs";
 import path from "node:path";
@@ -18,6 +18,10 @@ let m;
 if ((m = key.match(/^useCases\.([a-z-]+)\.levels\.(low|medium|high)$/))) {
   if (!Array.isArray(v) || v.length !== 2 || !ALIASES.includes(v[0]) || !EFFORTS.includes(v[1])) die(`value must be ["<alias>","<effort>"], alias one of ${[...new Set(ALIASES)].join(" ")}`);
   cfg.useCases = cfg.useCases || {}; cfg.useCases[m[1]] = cfg.useCases[m[1]] || {}; cfg.useCases[m[1]].levels = { ...(cfg.useCases[m[1]].levels || {}), [m[2]]: v };
+} else if ((m = key.match(/^models\.([a-z][a-z0-9-]{1,15})$/))) {
+  let prices = {}; try { prices = JSON.parse(fs.readFileSync(path.join(CL, "pricing.json"), "utf8")); } catch {}
+  if (typeof v !== "string" || !(prices[v] || prices[v.split("/").pop()])) die(`model ${v} is not in pricing.json (run pricing-sync first)`);
+  cfg.models = { ...(cfg.models || {}), [m[1]]: v };
 } else if (key === "shipBudgetUsd" || key === "jevTimeoutMs") {
   if (typeof v !== "number" || v <= 0 || v > (key === "jevTimeoutMs" ? 20000 : 200)) die("number out of range"); cfg[key] = v;
 } else if (key === "shipBudgetBySize") {
