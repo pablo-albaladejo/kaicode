@@ -24,7 +24,7 @@ let input = {}; try { input = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } 
 if (process.env.AIRCODE_SESSION_METADATA_PATH || /aircall-aircode-agents/.test(process.env.CLAUDE_CODE_AGENT || "")) return;
 const ti = input.tool_input || {}, file = String(ti.file_path || "");
 if (!/\/\.claude[^/]*\/knowledge\//.test(file)) return;
-if (/\/knowledge\/voice-samples\.md$/.test(file)) return;   // verbatim samples of the user's own messages: any language, never rewritten
+if (/\/knowledge\/voice-samples[\w-]*\.md$/.test(file)) return;   // verbatim samples of the user's own messages: any language, never rewritten
 const text = [ti.content, ti.new_string, ...(ti.edits || []).map((e) => e.new_string)].filter(Boolean).join("\n");
 const h = spanish(text); if (!h) return;
 process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny",

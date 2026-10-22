@@ -42,7 +42,9 @@ let PRICES = {};
 try { PRICES = JSON.parse(fs.readFileSync(path.join(CFG_DIR, "pricing.json"), "utf8")); } catch {}
 const UNIT = { input: 1, cacheWrite: 1.25, cacheRead: 0.1, output: 5 };
 // Model ids may carry a date or context suffix (claude-haiku-4-5-20251001, claude-opus-4-8[1m]).
-const normModel = (m = "") => m.replace(/\[.*\]$/, "").replace(/-\d{8}$/, "");
+// …and a Bedrock routing suffix (aws-bedrock/claude-opus-5-5:global). One unpriced model made the whole session fall back
+// to Claude Code's own $ estimate, which prices gateway models far above the gateway (retro 2026-10-23).
+const normModel = (m = "") => m.replace(/:(global|regional|us|eu|apac)$/, "").replace(/\[.*\]$/, "").replace(/-\d{8}$/, "");
 // "implementer--high" (effort variant generated for the router) is reported as "implementer"
 const baseAgent = (t) => (t ? String(t).replace(/--(?:[a-z0-9]+-)?(low|medium|high|xhigh|max)$/, "") : t);
 const bareModel = (m = "") => normModel(m).split("/").pop();

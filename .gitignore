@@ -34,4 +34,4 @@ agents/*--*.md
 !skill-src/**/
 !skill-src/**/*.md
 
-knowledge/voice-samples.md
+knowledge/voice-samples*.md
