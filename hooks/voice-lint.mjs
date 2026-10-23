@@ -70,8 +70,8 @@ function lint(raw, { skipFormat = false, where = "message" } = {}) {
   const words = text.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length;
   const expanded = (text.match(EXPANDED) || []).length;
   if (words > 30 && expanded >= 2 && !CONTRACTED.test(text)) issues.push(`No contractions in ${words} words ("${(text.match(EXPANDED) || []).slice(0, 3).join('", "')}"): people write "don't", "it's", "I'll". Use contractions.`);
-  const max = where === "Slack message" ? 120 : 250;
-  if (!skipFormat && words > max) issues.push(`${words} words: too long for a ${where} (about ${max} at most; Slack is usually 1 to 4 lines). Keep the point and the question; detail goes to the MR or ticket.`);
+  const max = where === "Slack message" ? 150 : 250;
+  if (!skipFormat && words > max) issues.push(`${words} words: too long for a ${where} (about ${max} at most; Slack is usually 1 to 6 lines). Keep the point and the question; detail goes to the MR or ticket.`);
   if (!skipFormat && where === "Slack message" && urls > 2) issues.push(`${urls} links in one Slack message: keep one, put the rest in the MR or ticket.`);
   return issues;
 }

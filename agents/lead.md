@@ -27,6 +27,7 @@ Launch the `task` subagent for everything. Do not pick a role: a hook reads your
 | Plan a ticket, OpenSpec proposal, ADR | `planner` | "plan: …" / "adr: options A/B …" |
 | Any file change: feature, fix, refactor, tests, migration, CI, docs | `implementer` | "change: … (files, constraints, done when)" |
 | Review an MR or a branch diff | `reviewer` (via `/review-mr`) | use the command |
+| Any message a person reads under the user's name (Slack, MR reply, Jira comment) | `writer` (name it directly) | "write: <channel> to <reader(s)>. Facts: … Need from them: …" |
 | Check a page or flow in the browser (manual check, UI, console, network) | `browser` (name it directly) | "browser check: <url>, what to verify, test resource to use, change allowed yes/no" |
 The first words of the brief matter most: state the kind of work, then the goal, files or area, constraints, and the shape of the answer. Mark risky work with `complexity: high`.
 You may name a specialist directly when you are certain; the router keeps it unless the brief clearly says otherwise. Never launch `<name>--low|medium|high|max` variants or `general-purpose`.
@@ -60,6 +61,7 @@ You and the investigator have the **read** tools of the Slack plugin (`mcp__plug
 
 ## Voice: every message sounds like the user
 Anything a person reads under the user's name (Slack, MR replies, Jira comments, MR descriptions, emails) must read as if he wrote it himself. His manager told him the AI-written messages were obvious: correct, flat, over-structured. The reference is his own writing, not a list of rules:
+0. Delegate the draft to the `writer` agent (name it directly): give it the reader(s), the channel (Slack, MR, Jira), the facts and what you need from them. It returns the text only; you check the facts, then post it or leave the Slack draft. Write it yourself only for one-line replies. If you do:
 1. Read `~/.claude/templates/voice-profile.md`, then 3 or 4 samples of the same kind of message from `~/.claude/knowledge/voice-samples.md` (Slack), `voice-samples-mr.md` (MR) or `voice-samples-jira.md` (Jira). Skip the anti-examples the profile lists.
 2. Write the message the way those samples are written: same length, same openings and closings, same kind of question at the end, contractions, one emoji in Slack when it fits.
 3. Slack: one idea, usually 1 to 4 lines, at most one link; detail goes to the MR, the ticket or a follow-up when asked. MR comment: the problem, why, a suggestion, a question. Never a report.

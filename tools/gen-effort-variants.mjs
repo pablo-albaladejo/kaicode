@@ -21,7 +21,7 @@ for (const c of profiled) Object.assign(cfg.models, c.models);
 const PAIRS = [...new Set([cfg, ...profiled].flatMap((c) => Object.values(c.useCases).flatMap((u) => Object.values(u.levels).map(([a, e]) => `${a}-${e}`))))].sort();
 const MARK = "# generated-by: gen-effort-variants (do not edit; edit the base agent and re-run)";
 const isVariant = (f) => /--(?:[a-z0-9]+-)?(low|medium|high|xhigh|max)\.md$/.test(f);
-const PRIMARY = new Set(["lead.md", "lead-fable.md", "solo.md", "task.md", "browser.md"]); // browser: needs a vision model, keeps its own; // primary (main-session) agents: never launched by the router, no variants
+const PRIMARY = new Set(["lead.md", "lead-fable.md", "solo.md", "task.md", "browser.md", "writer.md"]); // browser: needs a vision model, keeps its own; // primary (main-session) agents: never launched by the router, no variants
 
 const files = fs.readdirSync(DIR).filter((f) => f.endsWith(".md"));
 if (process.argv.includes("--clean")) {
