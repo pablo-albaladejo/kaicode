@@ -24,6 +24,7 @@ Resuming: continue from `stage`; if `stopped` is set, repeat that question.
 `plan-state stage K understand`.
 
 ## 2. understand
+Attachments are part of the ticket: the investigator downloads and reads them (`jira-api attachments <KEY>`) and its output carries an `Attachments:` line. A brief that says nothing about them is incomplete; send it back once.
 One `understand:` investigator for all tickets: "understand: <K> (spec for tickets <list>). For each ticket return: Ask (one line), Already decided (quote), Claims to verify against this repo (each with the file or command that proves or disproves it), Facts needed before planning (with the exact read-only command and who can run it), Open questions (each with: who decides — us, the owning team, product — and a proposed default), Depends on / blocks (keys), References. Across tickets: overlaps, gaps (work none of the tickets covers), a proposed order. Read the codebase map first; verify claims in code, do not repeat them."
 Gate: every ticket has an Ask and an Open questions line (even `none`). Save the output to `.claude/plan/<K>/brief.md` and `plan-state set K gaps='[…]'`.
 `plan-state stage K gate-facts`.

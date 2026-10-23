@@ -103,7 +103,13 @@ switch (cmd) {
   case "cost": {
     const t = resolveTicket(rest[0]); const s = load(t);
     let usd = rest[1] != null ? Number(rest[1]) : null;
-    if (usd == null) { try { const out = execSync(`node ${path.join(CFG_DIR, "tools", "cc-cost.mjs")} --ticket ${t} --days 30 --all --json`, { stdio: ["ignore", "pipe", "ignore"] }).toString(); usd = Number(JSON.parse(out).cost || 0); } catch { die("could not compute cost (cc-cost --ticket); pass the amount explicitly"); } }
+    if (usd == null) {
+      // run from $HOME: a removed worktree as cwd makes node fail with ENOENT uv_cwd (APR-8074). A failed or non-numeric
+      // answer never replaces the recorded cost: the budget gate must not act on garbage.
+      try { const out = execSync(`node ${path.join(CFG_DIR, "tools", "cc-cost.mjs")} --ticket ${t} --days 30 --all --json`, { cwd: os.homedir(), stdio: ["ignore", "pipe", "ignore"], timeout: 120000 }).toString(); const j = JSON.parse(out); usd = Number(j.cost); if (!Number.isFinite(usd) || usd < 0 || j.usd === false) throw new Error("not a USD figure"); }
+      catch (e) { console.log(`cost not updated (cc-cost failed: ${String(e.message).split("\n")[0].slice(0, 100)}); kept $${Number(s.cost_usd || 0).toFixed(3)} of $${s.budget_usd}`); process.exit(3); }
+    }
+    s.cost_base = Math.round(usd * 10000) / 10000; s.cost_source = "cc-cost --ticket";   // the statusline never goes below this
     s.cost_usd = Math.round(usd * 10000) / 10000; hist(s, `cost ${s.cost_usd}`); save(s);
     console.log(`$${s.cost_usd.toFixed(3)} of $${s.budget_usd}`);
     if (s.cost_usd > s.budget_usd) { console.log(`STOP: over budget ($${s.cost_usd.toFixed(2)} > $${s.budget_usd}). Ask the user before continuing; to continue run: ship-state set ${t} budget_usd=<new>`); process.exit(2); }

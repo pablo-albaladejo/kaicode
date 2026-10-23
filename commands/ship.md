@@ -58,6 +58,7 @@ If a spec exists for this ticket, record it. Look for the section `/plan` writes
 `ship-state stage <T> understand`.
 
 ## 2. understand
+Attachments are part of the ticket: the investigator downloads and reads them (`jira-api attachments <KEY>`) and its output carries an `Attachments:` line. A brief that says nothing about them is incomplete; send it back once.
 Launch: `understand: <T>. Read the ticket (acli jira workitem view <T>, or the spec at <spec path> if set), the code it touches (start from the codebase map: docs/codebase-map.md or ~/.claude/knowledge/repos/<repo>.md, plus ~/.claude/knowledge/lessons.md lines for this repo; bulk-read for anything big), nearby tests and related merged MRs. Return the understand format: Summary, Acceptance (testable criteria), Touches, Facts needed before planning (with the exact read-only command and who can run it), Conditional scope, Open questions with defaults, Sources.`
 Gate: output has `Mode: understand`, ≥ 1 `Acceptance` line and a `Facts needed before planning:` line (even if `none`). Otherwise ⇒ `attempt understand`; second failure ⇒ STOP.
 Save: `ship-state set <T> 'acceptance=<JSON array of the criteria>'` and write the whole output to `.claude/ship/<T>/brief.md` (`cat > … <<'EOF'`).

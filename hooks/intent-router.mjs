@@ -68,6 +68,20 @@ if (process.argv[2] === "--report") {
 
 // ── hook ───────────────────────────────────────────────────────────────
 let input = {}; try { input = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch {}
+// Context guard: the lead never sees the statusline, so it is told here, on every user message, how big its context is.
+// A long session decides worse (it mixes old facts, forgets decisions) and eventually fails with "Prompt is too long"
+// (2026-10-23: a lead at 928k tokens misread a question). Above 150k it must hand off; nothing else is routed.
+try {
+  const lines = fs.readFileSync(input.transcript_path, "utf8").trim().split("\n").slice(-60).reverse();
+  let ctx = 0; for (const l of lines) { try { const e = JSON.parse(l); const u = e.message?.usage; if (e.type === "assistant" && !e.isSidechain && u) { ctx = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0); break; } } catch {} }
+  if (ctx > 150000) {
+    const k = Math.round(ctx / 1000), hard = ctx > 400000;
+    log({ context_guard: k });
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext:
+      `[context-guard] This session is at ${k}k tokens of context (limit for good work: 150k). ${hard ? "It is far too long: do not start any new work. " : ""}Answer this message briefly${hard ? " only if it is a quick question" : ""}, then run /handoff and tell the user, in one line, to continue in a new session with the command it prints. Read the user's question twice before answering: answer exactly what was asked.` } }));
+    process.exit(0);
+  }
+} catch {}
 const prompt = String(input.prompt || "").trim();
 if (cfg.intentMode === "off") skip("off");
 if (process.env.AIRCODE_SESSION_METADATA_PATH || /aircall-aircode-agents/.test(process.env.CLAUDE_CODE_AGENT || "")) skip("aircode session");

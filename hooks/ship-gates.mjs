@@ -110,7 +110,9 @@ if (d.hook_event_name === "SubagentStop") {
 // `ship-state cost`). The lead raises it explicitly: /ship <T> --budget <usd>. A STOP already recorded lets it through
 // (the user is being asked); so does an explicit override in state.json (budget_override: true).
 if (d.hook_event_name === "PreToolUse" && /^(Agent|Task)$/.test(d.tool_name || "")) {
-  const cost = Number(st.s.cost_usd || 0), budget = Number(st.s.budget_usd || 0);
+  // Only a cost computed from real prices counts (statusline from pricing.json, or ship-state cost via cc-cost). A state
+  // written before 2026-10-23 may hold Claude Code's own estimate, several times the real spend: ignored until refreshed.
+  const cost = st.s.cost_source ? Number(st.s.cost_usd || 0) : 0, budget = Number(st.s.budget_usd || 0);
   if (budget > 0 && cost > budget && !st.s.budget_override && !st.s.stopped) {
     hist("budget: launch denied", `$${cost.toFixed(2)} > $${budget}`); save(); log({ gate: "budget", ticket: st.s.ticket, action: "deny", cost, budget });
     out({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `ship-gate: ${st.s.ticket} is over budget ($${cost.toFixed(2)} of $${budget}). STOP and ask the user; to continue they say the new budget: node ~/.claude/tools/ship-state.mjs set ${st.s.ticket} budget_usd=<usd>` } });

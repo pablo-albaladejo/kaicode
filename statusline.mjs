@@ -43,7 +43,7 @@ const weight = (u) => u.input * W.input + u.cacheWrite * W.cacheWrite + u.cacheR
 // Real prices (USD per 1M tokens) from ~/.claude/pricing.json — same file cc-cost uses.
 let PRICES = {};
 try { PRICES = JSON.parse(fs.readFileSync(path.join(CFG_DIR, "pricing.json"), "utf8")); delete PRICES._source; } catch {}
-const normModel = (m = "") => m.replace(/\[.*\]$/, "").replace(/-\d{8}$/, "");
+const normModel = (m = "") => m.replace(/:(global|regional|us|eu|apac)$/, "").replace(/\[.*\]$/, "").replace(/-\d{8}$/, "");   // :global = Bedrock routing suffix
 // tool_use_id → agent actually launched (model-router.mjs rewrites subagent_type through a variant)
 const ROUTER_LOG = path.join(CFG_DIR, "logs", "model-router.jsonl");
 let ROUTED = null;
@@ -348,9 +348,13 @@ try {
     const n = gate ? (s.attempts?.[gate] || 0) + 1 : 0; SHIP = { s, n, idx: l2.length, file: path.join(shipDir, pick, "state.json") }; l2.push(""); }
 } catch {}
 // rendered after the session cost is known (below): live = max(saved ticket cost, this session's real cost)
-const renderShip = () => { if (!SHIP) return; const { s, n, idx } = SHIP; const live = Math.max(Number(s.cost_usd || 0), SESSION_REAL ?? cost ?? 0);
-  // write-through: the budget gate in ship-gates reads state.cost_usd before every launch; keep it current (≥ 1 cent steps)
-  if (live > Number(s.cost_usd || 0) + 0.01 && SHIP.file) { try { const cur = JSON.parse(fs.readFileSync(SHIP.file, "utf8")); if (live > Number(cur.cost_usd || 0)) { cur.cost_usd = Math.round(live * 10000) / 10000; cur.cost_updated = new Date().toISOString(); fs.writeFileSync(SHIP.file, JSON.stringify(cur, null, 2) + "\n"); } } catch {} }
+const renderShip = () => { if (!SHIP) return; const { s, n, idx } = SHIP; const live = Number(s.cost_usd || 0);
+  // write-through for the budget gate: the ticket cost is the sum of its sessions' REAL cost (pricing.json). Claude Code's
+  // own figure is never used: it prices gateway models far above the gateway and blocked APR-8074 at "$64" for $4 real.
+  // Each session keeps its own entry, so a long session or a second one cannot ratchet the total by taking a max.
+  if (SESSION_REAL != null && d.session_id && SHIP.file) { try { const cur = JSON.parse(fs.readFileSync(SHIP.file, "utf8")); const by = cur.cost_by_session && typeof cur.cost_by_session === "object" ? cur.cost_by_session : {};
+    const prev = Number(by[d.session_id] || 0); if (SESSION_REAL > prev + 0.01) { by[d.session_id] = Math.round(SESSION_REAL * 10000) / 10000; cur.cost_by_session = by;
+      cur.cost_usd = Math.round(Math.max(Number(cur.cost_base || 0), Object.values(by).reduce((a, x) => a + Number(x || 0), 0)) * 10000) / 10000; cur.cost_source = "statusline:pricing.json"; cur.cost_updated = new Date().toISOString(); fs.writeFileSync(SHIP.file, JSON.stringify(cur, null, 2) + "\n"); } } catch {} }
   const eta = s.stopped || HUMAN_STAGES.has(s.stage) ? null : shipEta(s);
   // progress track: one cell per /ship stage, filled up to the current one (human stops shown as ◆)
   const si = SHIP_STAGES.indexOf(s.stage), track = SHIP_STAGES.map((st, i) => (i < si ? "▰" : i === si ? (HUMAN_STAGES.has(st) || s.stopped ? "◆" : "▶") : HUMAN_STAGES.has(st) ? "◇" : "▱")).join("");
