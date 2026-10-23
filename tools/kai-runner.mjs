@@ -39,6 +39,9 @@ const ALLOW = {
   // the user's own message samples (knowledge/voice-samples*.md) for the voice work; copied into the git-ignored review folder
   "voice-copy": () => ["rsync", ["-a", "--include=voice-samples*.md", "--exclude=*", path.join(CL, "knowledge") + "/", path.join(REPO, ".kaicode-review", "voice") + "/"]],
   "voice-bench": () => [NODE, [path.join(REPO, "tools", "voice-bench.mjs"), path.join(REPO, ".kaicode-review", "voice-bench", "cases.json"), path.join(REPO, "voice-bench")]],
+  // MCP servers and their connection state as Claude Code sees them (output masked: args can carry credentials)
+  "mcp-list":   () => [NODE, ["-e", `const {execFileSync}=require("child_process");const fs=require("fs");const H=require("os").homedir();const bin=["/opt/homebrew/bin/claude","/usr/local/bin/claude",H+"/.local/bin/claude",H+"/.claude/local/claude"].find(p=>fs.existsSync(p));let o="";try{o=execFileSync(bin,["mcp","list"],{encoding:"utf8",timeout:90000,cwd:H})}catch(e){o=String(e.stdout||"")+String(e.stderr||e.message)}import(${JSON.stringify(path.join(REPO, "hooks", "redact.mjs"))}).then(m=>console.log(m.redact(o)))`]],
+  "confluence-get": (a) => { if (!/^\d{5,}$/.test(a[0] || "")) throw new Error("confluence-get <pageId>"); return [NODE, [path.join(REPO, "tools", "confluence-read.mjs"), "get", a[0]]]; },
   "pricing":    () => ["cat", [path.join(CL, "pricing.json")]],
   "scrub-logs": () => [NODE, [path.join(REPO, "tools", "log-scrub.mjs"), path.join(CL, "logs")]],
   "retro":      (a) => [NODE, [path.join(CL, "tools", "retro-report.mjs"), "--days", String(Math.min(60, Math.max(1, parseInt(a[0] || "7", 10) || 7)))]],
