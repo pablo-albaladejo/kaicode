@@ -101,6 +101,23 @@ else if (tool === "Bash") {
   } else process.exit(0);
 }
 if (body == null) process.exit(0);
+// The main session must have the writer agent draft it (2026-10-23: the lead judged a "late to standup" message too
+// simple to delegate and wrote a generic one). Checked in the transcript: a writer launch after the user's last message.
+// Subagents (the writer itself, investigators) and replies of six words or fewer are exempt.
+if (!input.agent_type && input.transcript_path && String(body).trim().split(/\s+/).length > 6) {
+  let lines = []; try { lines = fs.readFileSync(input.transcript_path, "utf8").trim().split("\n").slice(-400); } catch {}
+  let lastUser = -1, writerAt = -1;
+  lines.forEach((l, i) => { try { const e = JSON.parse(l);
+    if (e.type === "user" && !e.isSidechain && (typeof e.message?.content === "string" || (e.message?.content || []).some((b) => b.type === "text"))) lastUser = i;
+    if (e.type === "assistant") for (const b of e.message?.content || []) if (b.type === "tool_use" && /^(Agent|Task)$/.test(b.name) && /^writer\b/.test(String(b.input?.subagent_type || ""))) writerAt = i;
+  } catch {} });
+  if (lines.length && writerAt < lastUser) {
+    try { fs.appendFileSync(`${process.env.CLAUDE_CONFIG_DIR || process.env.HOME + "/.claude"}/logs/voice-lint.jsonl`, JSON.stringify({ ts: new Date().toISOString(), where, ok: false, issues: ["no writer"] }) + "\n"); } catch {}
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny",
+      permissionDecisionReason: `voice-lint: messages that go out under the user's name are drafted by the writer agent, however short. Launch it (subagent_type "writer") with: channel, reader(s), the facts, what you need from them. Then use its text here. For Slack, find where he usually posts this kind of message first (search his own messages, e.g. from:@me <topic>), and only draft into a channel he is a member of.` } }));
+    process.exit(0);
+  }
+}
 const issues = lint(body, { skipFormat, where });
 try { fs.appendFileSync(`${process.env.CLAUDE_CONFIG_DIR || process.env.HOME + "/.claude"}/logs/voice-lint.jsonl`, JSON.stringify({ ts: new Date().toISOString(), where, ok: !issues.length, issues: issues.map((i) => i.slice(0, 60)) }) + "\n"); } catch {}
 if (!issues.length) process.exit(0);
