@@ -10,7 +10,6 @@
 // Test: echo 'text' | node voice-lint.mjs --check
 import fs from "node:fs";
 
-const MAX_SENTENCE_WORDS = 25, MAX_WORDS = 180;
 // Channels where a Sports Club / race announcement is a bulletin for the whole channel, not a short reply to one
 // person: the office writes them bilingual and long, with bullets and several bold bits, so those four format checks
 // would block every one of them. Only the checks about sounding like a machine still run there.
@@ -33,34 +32,51 @@ const PHRASES = [
   ["i was wrong", "(drop it, state the fact)"], ["less than i first thought", "(drop it, state the fact)"],
 ];
 
-function lint(raw, { skipFormat = false } = {}) {
+// Tells that give away an AI-written message even when every word is plain (manager feedback, 2026-10): commentary
+// sentences, labels used as sentences, bows tied at the end, report register. Each maps to what to do instead.
+const TELLS = [
+  [/\bone thing that (may|might) matter\b/i, "\"one thing that may matter\": just say the thing"],
+  [/\bi (may|might) not have the full picture\b/i, "a formula hedge: ask a real question instead (\"Am I missing something?\")"],
+  [/\bthat way you (never|don'?t|do not|won'?t)\b/i, "a bow-tying closing line: stop after the point"],
+  [/\b(it|this) (does not|doesn'?t) block you\b/i, "a bow-tying closing line: stop after the point"],
+  [/\b(that|this) is on us\b/i, "\"that is on us\": say what you will do, or nothing"],
+  [/\bhere'?s why:|\bhere is why:/i, "\"here's why:\" is report register: just give the reason"],
+  [/\bworth (most |the most )?attention\b/i, "\"worth most attention\": say \"the bit I'd look at is…\""],
+  [/\b(hope this helps|let me know if you have any (other )?questions|happy to help)\b/i, "a stock closing: drop it"],
+  [/(→|->).*(→|->)/, "an arrow chain: write it as a sentence or a short list"],
+  [/\b(serves as|maintaining consistency|in terms of|it is worth noting|it's worth noting)\b/i, "report register: say it the way you'd say it out loud"],
+];
+const EXPANDED = /\b(do not|does not|did not|is not|are not|was not|were not|have not|has not|i am|i will|we will|it is|that is|there is|we are|you are|cannot|can not|will not|would not|should not|could not|i have|we have)\b/gi;
+const CONTRACTED = /\b\w+['’](t|s|re|ll|ve|m|d)\b/i;
+
+function lint(raw, { skipFormat = false, where = "message" } = {}) {
+  const urls = (String(raw || "").match(/https?:\/\/\S+|<https?:[^>]+>/g) || []).length;
   const text = String(raw || "")
     .replace(/```[\s\S]*?```/g, " ").replace(/`[^`\n]*`/g, " CODE ")
-    .replace(/https?:\/\/\S+/g, " URL ").replace(/<[@#!][^>]*>/g, " @X ").replace(/\b[\w.+]+@[\w-]+\.[\w.]+\b/g, " EMAIL ")
+    .replace(/<https?:[^>]+>|https?:\/\/\S+/g, " URL ").replace(/<[@#!][^>]*>/g, " @X ").replace(/\b[\w.+]+@[\w-]+\.[\w.]+\b/g, " EMAIL ")
     .replace(/\b[A-Z][A-Z0-9]+-\d+\b/g, " TICKET ");
   const issues = [];
-  const around = (i, len = 1) => JSON.stringify(text.slice(Math.max(0, i - 18), i + len + 18).replace(/\s+/g, " ").trim());
-  // marks
-  if (!skipFormat) {
-    const marks = [...text.matchAll(/[-–—;→⇒…•]/g)].slice(0, 6);
-    if (marks.length) issues.push(`No dashes, semicolons, arrows, ellipsis or bullet marks (use short sentences, "to", "and", or a numbered list): ${marks.map((m) => around(m.index)).join(", ")}`);
-  }
   if (/^\s{0,3}#{1,6}\s/m.test(text)) issues.push("No headings: it is a message, not a document.");
-  if (!skipFormat && (text.match(/\*\*[^*]+\*\*|(^|\s)\*[^*\s][^*]*\*(?=\s|$)/g) || []).length > 2) issues.push("Too much bold: at most one or two words, or none.");
-  // words
+  if (!skipFormat && (text.match(/\*\*[^*]+\*\*|(^|\s)\*[^*\s][^*]*\*(?=\s|$)/g) || []).length > 2) issues.push("Too much bold: one or two words at most, or none.");
   const low = text.toLowerCase();
   const hits = PHRASES.filter(([p]) => new RegExp(`\\b${p.replace(/'/g, "['’]")}\\b`).test(low)).slice(0, 8);
   if (hits.length) issues.push(`Say it plainly: ${hits.map(([p, alt]) => `"${p}" → ${alt}`).join(", ")}`);
-  // B1: sentence length and total length
-  const sentences = text.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter((s) => /[a-z]/i.test(s));
-  const long = sentences.filter((s) => s.split(/\s+/).length > MAX_SENTENCE_WORDS);
-  if (!skipFormat && long.length) issues.push(`Sentences over ${MAX_SENTENCE_WORDS} words (split them, one idea each): ${long.slice(0, 3).map((s) => JSON.stringify(s.slice(0, 70) + "…")).join(", ")}`);
+  const tells = TELLS.filter(([re]) => re.test(text)).map(([, why]) => why);
+  // labels used as sentences, checked sentence by sentence: "About why the field is locked." / "Eligible lines."
+  const sentences = text.split(/(?<=[.!?:])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+  if (sentences.some((x) => /^(about|regarding) (why |how |the )?[^.?!]{0,70}\.$/i.test(x))) tells.push("a label used as a sentence (\"About why X.\"): start with the point itself");
+  if (sentences.some((x) => /^[A-Z][a-z]+( [a-z]+){0,2}\.$/.test(x) && !/^(Thanks|Thank you|Sure|Done|Agreed|Sorry|Cheers|Merged|Fixed|Deployed|Yes|No|Nice|Great|Perfect|Okay|Ok)\b/.test(x))) tells.push("a two or three word label (\"Eligible lines.\"): fold it into a sentence");
+  if (tells.length) issues.push(`Reads as AI-written: ${[...new Set(tells)].slice(0, 5).join("; ")}`);
   const words = text.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length;
-  if (!skipFormat && words > MAX_WORDS) issues.push(`${words} words: too long for a message (max ${MAX_WORDS}). Keep the answer and the one question; move detail to the ticket or a follow-up reply.`);
+  const expanded = (text.match(EXPANDED) || []).length;
+  if (words > 30 && expanded >= 2 && !CONTRACTED.test(text)) issues.push(`No contractions in ${words} words ("${(text.match(EXPANDED) || []).slice(0, 3).join('", "')}"): people write "don't", "it's", "I'll". Use contractions.`);
+  const max = where === "Slack message" ? 120 : 250;
+  if (!skipFormat && words > max) issues.push(`${words} words: too long for a ${where} (about ${max} at most; Slack is usually 1 to 4 lines). Keep the point and the question; detail goes to the MR or ticket.`);
+  if (!skipFormat && where === "Slack message" && urls > 2) issues.push(`${urls} links in one Slack message: keep one, put the rest in the MR or ticket.`);
   return issues;
 }
 
-if (process.argv.includes("--check")) { const issues = lint(fs.readFileSync(0, "utf8")); console.log(issues.length ? issues.map((i) => "✗ " + i).join("\n") : "✓ reads fine"); process.exit(issues.length ? 1 : 0); }
+if (process.argv.includes("--check")) { const issues = lint(fs.readFileSync(0, "utf8"), { where: process.argv.includes("--mr") ? "MR reply" : "Slack message" }); console.log(issues.length ? issues.map((i) => "✗ " + i).join("\n") : "✓ reads fine"); process.exit(issues.length ? 1 : 0); }
 
 let input = {}; try { input = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch { process.exit(0); }
 const tool = String(input.tool_name || ""), ti = input.tool_input || {};
@@ -85,7 +101,7 @@ else if (tool === "Bash") {
   } else process.exit(0);
 }
 if (body == null) process.exit(0);
-const issues = lint(body, { skipFormat });
+const issues = lint(body, { skipFormat, where });
 try { fs.appendFileSync(`${process.env.CLAUDE_CONFIG_DIR || process.env.HOME + "/.claude"}/logs/voice-lint.jsonl`, JSON.stringify({ ts: new Date().toISOString(), where, ok: !issues.length, issues: issues.map((i) => i.slice(0, 60)) }) + "\n"); } catch {}
 if (!issues.length) process.exit(0);
 process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny",

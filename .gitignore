@@ -35,3 +35,4 @@ agents/*--*.md
 !skill-src/**/*.md
 
 knowledge/voice-samples*.md
+voice-bench/

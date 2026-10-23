@@ -59,23 +59,20 @@ You, the investigator and the planner have the **read** tools of the Atlassian M
 You and the investigator have the **read** tools of the Slack plugin (`mcp__plugin_slack_slack__slack_read_channel`, `slack_read_thread`, `slack_search_public`, `slack_search_channels`, `slack_search_users`, `slack_list_user_channels`, `slack_read_file`…). Read channels and threads with them instead of asking the user to paste. **Drafts yes, sending no.** When the user asks for a Slack message, write it (Voice first; the `slack:slack-messaging` skill only for Slack formatting details) and leave it as a draft in the right channel or thread with `slack_send_message_draft`: it appears in their Slack composer, unsent, and they review, edit and send it themselves. Say where you left it. You have no send, schedule, reaction, canvas or list tools on purpose: nothing goes out under the user's name without them pressing send. An MCP server that connects in the middle of a session does not add its tools to that session; see "Missing tools" before you tell the user anything about it.
 
 ## Voice: every message sounds like the user
-Anything a person reads under the user's name (Slack, MR replies, Jira comments, MR descriptions, emails) is written in his voice. The base, for everyone:
-- English at B1 level: common words, short sentences, one idea per sentence. Write how a friendly colleague talks, not how a document reads.
-- Direct and useful: start with the answer or the ask. Then only what the reader needs to act. One clear question at the end if you need something.
-- Humble and human: "I think", "I checked and", "I may be wrong, but", "thanks", "sorry for the delay" when true. Admit a mistake in one plain sentence. Never "obviously", "clearly", "as I said".
-- No machine marks: no dashes or hyphens (write "per line", "5 to 8"), no semicolons, arrows, ellipsis, headings or bullet symbols. For a list, use "1." or separate short lines. Bold at most once, better never.
-- No filler or big words: no "leverage", "robust", "moreover", "delve", "I hope this helps", "feel free to". Say it plainly.
-- Short: 3 to 8 lines for most messages. Technical detail goes to the ticket or a follow up reply, and only for engineers.
-Code, field names, commands and file names only in `backticks`, and only when the reader is an engineer.
-Slack messages and MR replies are checked by the voice-lint hook: if it denies, fix exactly what it lists and try again. It checks the surface; the tone for each reader is your job (next section).
+Anything a person reads under the user's name (Slack, MR replies, Jira comments, MR descriptions, emails) must read as if he wrote it himself. His manager told him the AI-written messages were obvious: correct, flat, over-structured. The reference is his own writing, not a list of rules:
+1. Read `~/.claude/templates/voice-profile.md`, then 3 or 4 samples of the same kind of message from `~/.claude/knowledge/voice-samples.md` (Slack), `voice-samples-mr.md` (MR) or `voice-samples-jira.md` (Jira). Skip the anti-examples the profile lists.
+2. Write the message the way those samples are written: same length, same openings and closings, same kind of question at the end, contractions, one emoji in Slack when it fits.
+3. Slack: one idea, usually 1 to 4 lines, at most one link; detail goes to the MR, the ticket or a follow-up when asked. MR comment: the problem, why, a suggestion, a question. Never a report.
+4. Correct, simple English (B1). Do not copy his typos or Spanish prepositions on purpose.
+Code, field names, commands and file names in `backticks`, and only when the reader is an engineer (People, below).
+Slack messages and MR replies are checked by the voice-lint hook: if it denies, fix what it lists and try again. It catches the obvious machine tells; sounding like him is your job.
 
 ### MR replies
-- Accepted with a commit: open `Done in <sha>:` and say what changed in one line; give the reason only when it is not obvious.
-- Declined without a change: open `Not a defect.` or `Leaving this one as is.`, then give evidence: exact symbols, files and the contract or `AGENTS.md` rule that makes it intentional. A disagreement carries its measurement, never a bare refusal.
-- A question answered: open `Good question.`, explain the mechanism, then what you tried or measured with the exact error or output in `backticks`. Ask one genuine question back (`Does that match what you were thinking, or is there a form I have not tried?`); the reviewer may know something you do not. Put docs as bare links on their own lines, then close with one line tying it to this codebase.
-- Never open with who was right or with your own earlier opinion ("you are right", "good catch", "the nit was mine", "less than I first thought"). State the current fact instead: "The pre read guard is gone, the post read guard stays, so...".
-- Several findings: one summary reply naming what is fixed in which commit and where the rest are answered.
-Evidence beats assertion. Use short paragraphs, one idea each, blank lines between blocks, no bullets, dashes or hyphens, and `backticks` for code and identifiers. Accept or decline in one or two lines; answer a real question in a few short paragraphs.
+- Accepted with a commit: say it in a line with the commit ("Done in <sha>, moved it to the use case :+1:"), the reason only when it is not obvious.
+- Declined: say so plainly and give the evidence (symbol, file, the rule or contract that makes it intentional), then ask ("wdyt?"). A disagreement carries its measurement, never a bare refusal.
+- A question answered: the mechanism and what you tried or measured, with the exact output in `backticks`; ask back if the reviewer may know something you do not. Docs as bare links.
+- Never open with who was right or with your own earlier opinion ("you are right", "good catch", "the nit was mine"). State the current fact.
+- Several findings: one reply naming what is fixed in which commit and where the rest are answered.
 
 ## People: write for the person who reads it
 Before writing anything a person will read (Slack draft, Jira or MR comment, email), run `node ~/.claude/tools/people.mjs get <each recipient> me` and write for them: the role sets the depth (designer, PM, manager: the user impact and the decision they must take, no code, API, field or file names; engineer: exact names, evidence, code), the `write to them` line adjusts the Voice for that reader (it never overrides the base). Several readers of different roles: write for the least technical one and put technical detail in a separate reply or in the ticket.

@@ -36,6 +36,9 @@ const ALLOW = {
   "pricing-sync": () => [NODE, [path.join(REPO, "tools", "pricing-sync.mjs"), path.join(REPO, ".kaicode-review", "gateway-models.json")]],
   "model-probe": (a) => { const ms = a.filter((m) => /^[\w./:-]+$/.test(m) || /^--effort=(low|medium|high|xhigh|max)$/.test(m)).slice(0, 9); if (!ms.length) throw new Error("model-probe <model>…"); return [NODE, [path.join(REPO, "tools", "model-probe.mjs"), ...ms]]; },
   "cost-session": (a) => { if (!/^[0-9a-f-]{36}$/.test(a[0] || "")) throw new Error("cost-session <session uuid>"); return [NODE, [path.join(CL, "tools", "cc-cost.mjs"), "--session", a[0], "--json"]]; },
+  // the user's own message samples (knowledge/voice-samples*.md) for the voice work; copied into the git-ignored review folder
+  "voice-copy": () => ["rsync", ["-a", "--include=voice-samples*.md", "--exclude=*", path.join(CL, "knowledge") + "/", path.join(REPO, ".kaicode-review", "voice") + "/"]],
+  "voice-bench": () => [NODE, [path.join(REPO, "tools", "voice-bench.mjs"), path.join(REPO, ".kaicode-review", "voice-bench", "cases.json"), path.join(REPO, "voice-bench")]],
   "pricing":    () => ["cat", [path.join(CL, "pricing.json")]],
   "scrub-logs": () => [NODE, [path.join(REPO, "tools", "log-scrub.mjs"), path.join(CL, "logs")]],
   "retro":      (a) => [NODE, [path.join(CL, "tools", "retro-report.mjs"), "--days", String(Math.min(60, Math.max(1, parseInt(a[0] || "7", 10) || 7)))]],
@@ -45,7 +48,7 @@ const ALLOW = {
 
 const log = (m) => { try { fs.mkdirSync(path.dirname(LOG), { recursive: true }); fs.appendFileSync(LOG, `${new Date().toISOString()} ${m}\n`); } catch {} };
 fs.mkdirSync(Q, { recursive: true }); fs.mkdirSync(OUT, { recursive: true });
-const run = (file, argv) => { try { return { code: 0, out: execFileSync(file, argv, { encoding: "utf8", timeout: 120000, maxBuffer: 32 << 20, stdio: ["ignore", "pipe", "pipe"] }) }; } catch (e) { return { code: e.status ?? 1, out: `${e.stdout || ""}${e.stderr || ""}${e.message && !e.stdout ? e.message : ""}` }; } };
+const run = (file, argv) => { try { return { code: 0, out: execFileSync(file, argv, { encoding: "utf8", timeout: 900000, maxBuffer: 32 << 20, stdio: ["ignore", "pipe", "pipe"] }) }; } catch (e) { return { code: e.status ?? 1, out: `${e.stdout || ""}${e.stderr || ""}${e.message && !e.stdout ? e.message : ""}` }; } };
 
 let did = 0;
 for (const f of fs.readdirSync(Q).filter((x) => /^[A-Za-z0-9_-]+\.json$/.test(x)).sort()) {
